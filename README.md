@@ -4,7 +4,7 @@ We evaluate rationales in the task of aspect-based sentiment analysis (ABSA) aga
 The software in this repository
 * fine-tunes English BERT-Base in the SemEval 2016 ABSA shared task 5, subtask "Phase B"
 * applies methods for identifying a subset of the input tokens that is most influential on the sentiment prediction (a salience map, rationale or explanation)
-* evaluates the rationales against manually annotated sentiment expressions relevant for the selected abspect term
+* evaluates the rationales against manually annotated sentiment expressions relevant for the selected aspect term
 
 
 ## Data
