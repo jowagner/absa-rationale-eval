@@ -42,6 +42,7 @@ transformers \
 pytorch-lightning \
 pytorch-nlp \
 tensorboard \
+lightning-transformers \
 ; do
     echo
     echo "Installing $I"
