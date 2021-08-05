@@ -946,18 +946,16 @@ class Classifier(Classifier_part_5):
 
 # 4.1 Training
 
-
-
-classifier = Classifier(
+if not skip_training:
+    classifier = Classifier(
     hparams = hparams,
     # parameters for ABSA_DataModule:
     data_split = (tr_dataset_object, dev_dataset_combined, te_dataset_combined),
     # additional required parameters:
     tokeniser  = tokeniser
-)
-print('Ready.')
+    )
+    print('Ready.')
 
-if not skip_training:
 # https://pytorch-lightning.readthedocs.io/en/latest/common/early_stopping.html
     from pytorch_lightning.callbacks.early_stopping import EarlyStopping
     from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
