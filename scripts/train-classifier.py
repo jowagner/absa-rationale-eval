@@ -29,6 +29,16 @@ elif command == 'eval':
 else:
     raise ValueError('unknown command %s' %command)
 
+training_task = sys.argv[3]
+if training_task == 'Full':     # sequence B is the review sentence as is
+    training_mask = None
+elif training_task == 'SE':     # sequence B is only the sentiment expression, all other words are masked
+    training_mask = 'O'
+elif training_task == 'Other':  # sequence B is all but the SE (the SE words are masked)
+    training_mask = 'I'
+else:
+    raise ValueError('unknown training task %s' %training_task)
+
 # 1.1 BERT Configuration
 
 model_size          = 'base'  # choose between 'tiny', 'base' and 'large'
@@ -511,6 +521,7 @@ tr_dataset_object = ABSA_Dataset(
     tr_dataset,
     put_question_first = put_question_first,
     template_index = -1,  # pick question at random
+    mask = training_mask,
 )
 
 print('Training size:', len(tr_dataset_object))
@@ -523,6 +534,8 @@ for template_index in range(len(templates)):
         dev_dataset,
         put_question_first = put_question_first,
         template_index = template_index,
+        mask = training_mask,    # e.g. if we train on SE data we want to
+                                 # pick the model according to the SE score
     ))
 
 # also provide a dev set that is the union of the above dev sets,
