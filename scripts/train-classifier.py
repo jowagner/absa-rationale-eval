@@ -948,11 +948,11 @@ class Classifier(Classifier_part_5):
 
 if not skip_training:
     classifier = Classifier(
-    hparams = hparams,
-    # parameters for ABSA_DataModule:
-    data_split = (tr_dataset_object, dev_dataset_combined, te_dataset_combined),
-    # additional required parameters:
-    tokeniser  = tokeniser
+        hparams = hparams,
+        # parameters for ABSA_DataModule:
+        data_split = (tr_dataset_object, dev_dataset_combined, te_dataset_combined),
+        # additional required parameters:
+        tokeniser  = tokeniser
     )
     print('Ready.')
 
@@ -961,30 +961,30 @@ if not skip_training:
     from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 
     early_stop_callback = EarlyStopping(
-    monitor   = 'val_acc',
-    min_delta = 0.00,
-    patience  = 7,
-    verbose   = False,
-    mode      = 'max',
+        monitor   = 'val_acc',
+        min_delta = 0.00,
+        patience  = 7,
+        verbose   = False,
+        mode      = 'max',
     )
 
     save_top_model_callback = ModelCheckpoint(
-    save_top_k = 3,
-    monitor    = 'val_acc',
-    mode       = 'max',
-    filename   = '{val_acc:.4f}-{epoch:02d}-{val_loss:.4f}'
+        save_top_k = 3,
+        monitor    = 'val_acc',
+        mode       = 'max',
+        filename   = '{val_acc:.4f}-{epoch:02d}-{val_loss:.4f}'
     )
 
     trainer = pl.Trainer(
-    callbacks=[early_stop_callback, save_top_model_callback],
-    max_epochs = max_epochs,
-    min_epochs = classifier.hparams.nr_frozen_epochs + 2,
-    gpus = classifier.hparams.gpus,
-    accumulate_grad_batches = accumulate_grad_batches,
-    limit_train_batches     = limit_train_batches,
-    check_val_every_n_epoch = 1,
-    # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
-    logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
+        callbacks=[early_stop_callback, save_top_model_callback],
+        max_epochs = max_epochs,
+        min_epochs = classifier.hparams.nr_frozen_epochs + 2,
+        gpus = classifier.hparams.gpus,
+        accumulate_grad_batches = accumulate_grad_batches,
+        limit_train_batches     = limit_train_batches,
+        check_val_every_n_epoch = 1,
+        # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
+        logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
     )
 
 
@@ -996,52 +996,52 @@ if not skip_training:
 
     print('Best validation set accuracy:', save_top_model_callback.best_model_score)
 
-# The following automatically loads the best weights according to
-# https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
+    # The following automatically loads the best weights according to
+    # https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
 
     print('Test results via trainer.test():')
     results = trainer.test()  # also prints results as a side effect
 
 
-# 5.1 Save Best Model outside Logs
+    # 5.1 Save Best Model outside Logs
 
-# https://pytorch-lightning.readthedocs.io/en/latest/common/weights_loading.html
+    # https://pytorch-lightning.readthedocs.io/en/latest/common/weights_loading.html
 
-# after just having run test(), the best checkpoint is still loaded but that's
-# not a documented feature so to be on the safe side for future versions we
-# need to explicitly load the best checkpoint:
+    # after just having run test(), the best checkpoint is still loaded but that's
+    # not a documented feature so to be on the safe side for future versions we
+    # need to explicitly load the best checkpoint:
 
     best_model = Classifier.load_from_checkpoint(
-    checkpoint_path = trainer.checkpoint_callback.best_model_path
-    # the hparams including hparams.batch_size appear to have been
-    # saved in the checkpoint automatically
+        checkpoint_path = trainer.checkpoint_callback.best_model_path
+        # the hparams including hparams.batch_size appear to have been
+        # saved in the checkpoint automatically
     )
-# best_model.save_checkpoint('best.ckpt') does not exist
-# --> need to wrap model into trainer to be able to save a checkpoint
+    # best_model.save_checkpoint('best.ckpt') does not exist
+    # --> need to wrap model into trainer to be able to save a checkpoint
 
     new_trainer = pl.Trainer(
-    resume_from_checkpoint = trainer.checkpoint_callback.best_model_path,
-    gpus = -1,  # avoid warnings (-1 = automatic selection)
-    # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
-    logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
+        resume_from_checkpoint = trainer.checkpoint_callback.best_model_path,
+        gpus = -1,  # avoid warnings (-1 = automatic selection)
+        # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
+        logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
     )
     new_trainer.model = best_model  # @model.setter in plugins/training_type/training_type_plugin.py
 
     new_trainer.save_checkpoint(
-    "best-model-weights-only.ckpt",
-    True,  # save_weights_only
-    # (if saved with setting the 2nd arg to True, the checkpoint   # TODO: "False"?
-    # will contain absoulte paths and training parameters)
+        "best-model-weights-only.ckpt",
+        True,  # save_weights_only
+        # (if saved with setting the 2nd arg to True, the checkpoint   # TODO: "False"?
+        # will contain absoulte paths and training parameters)
     )
 
-# to just save the bert model in pytorch format and without the classification head, we follow
-# https://github.com/PyTorchLightning/pytorch-lightning/issues/3096#issuecomment-686877242
+    # to just save the bert model in pytorch format and without the classification head, we follow
+    # https://github.com/PyTorchLightning/pytorch-lightning/issues/3096#issuecomment-686877242
     best_model.bert.save_pretrained('best-bert-encoder.pt')
 
-# TODO: the above only saves the BERT encoder, not the classification head
+    # TODO: the above only saves the BERT encoder, not the classification head
 
-# Since the lightning module inherits from pytorch, we can save the full network in
-# pytorch format:
+    # Since the lightning module inherits from pytorch, we can save the full network in
+    # pytorch format:
     torch.save(best_model.state_dict(), 'best-model.pt')
 
     print('Ready')
