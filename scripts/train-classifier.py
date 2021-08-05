@@ -9,8 +9,10 @@
 # Author: Joachim Wagner
 
 import numpy as np
+import os
 import random
 import sys
+import time
 import torch
 
 seed = int(sys.argv[1])
@@ -19,19 +21,27 @@ torch.manual_seed(seed)
 random.seed(seed)
 np.random.seed(seed)
 
+command = sys.argv[2]
+if command == 'train':
+    skip_training = False
+elif command == 'eval':
+    skip_training = True
+else:
+    raise ValueError('unknown command %s' %command)
+
 # 1.1 BERT Configuration
 
 model_size          = 'base'  # choose between 'tiny', 'base' and 'large'
 max_sequence_length = 256
-batch_size          = 9       # 10 should work on a 12 GB card if not also used for graphics / GUI
+batch_size          = 8       # 10 should work on a 12 GB card if not also used for graphics / GUI
 virtual_batch_size  = 64
 
 # TODO: what virtual batch size should we use
 # https://arxiv.org/abs/1904.00962 are cited to say a large batch size (32k) is better
 # but they themselves warn that "naively" doing so can degrade performance
 
-max_epochs = 5
-limit_train_batches = 0.2     # fraction of training data to use
+max_epochs = 10
+limit_train_batches = 1.0     # fraction of training data to use
 
 hparams = {
     "encoder_learning_rate": 1e-05,  # Encoder specific learning rate
@@ -461,7 +471,7 @@ class ABSA_Dataset_part_1(Dataset):
 
 
 class ABSA_Dataset(ABSA_Dataset_part_1):
-                   
+
     def pick_question(self, entity_type, attribute_label, domain, polarity):
         global templates
         global observed_polarities
@@ -668,14 +678,14 @@ class Classifier_part_1(pl.LightningModule):
 import logging as log
 
 class Classifier_part_2(Classifier_part_1):
-    
+
     def unfreeze_encoder(self) -> None:
         if self._frozen:
             log.info('\n== Encoder model fine-tuning ==')
             for param in self.bert.parameters():
                 param.requires_grad = True
             self._frozen = False
-            
+
     def freeze_encoder(self) -> None:
         for param in self.bert.parameters():
             param.requires_grad = False
@@ -698,20 +708,20 @@ class Classifier_part_2(Classifier_part_1):
             ]
             sample["predicted_label"] = predicted_labels[0]
         return sample
-    
+
     # functionality to obtain predictions for a dataset as a
     # side effect of asking PyTorch Lightning to get evaluation
     # results for a dataset
     # (the framework does not seem to provide a function to get
     # all predictions for a dataset)
-    
+
     def start_recording_predictions(self):
         self.record_predictions = True
         self.reset_recorded_predictions()
-        
+
     def stop_recording_predictions(self):
         self.record_predictions = False
-        
+
     def reset_recorded_predictions(self):
         self.seq2label = {}
 
@@ -719,7 +729,7 @@ class Classifier_part_2(Classifier_part_1):
 from torchnlp.utils import lengths_to_mask
 
 class Classifier_part_3(Classifier_part_2):
-    
+
     def forward(self, batch_input):
         tokens  = batch_input['input_ids']
         lengths = batch_input['length']
@@ -743,7 +753,7 @@ class Classifier_part_3(Classifier_part_2):
                     del key[-1]
                 self.seq2label[tuple(key)] = predicted_labels[index]
         return {"logits": logits}
-    
+
     def loss(self, predictions: dict, targets: dict) -> torch.tensor:
         """
         Computes Loss value according to a loss function.
@@ -754,11 +764,11 @@ class Classifier_part_3(Classifier_part_2):
             torch.tensor with loss value.
         """
         return self._loss(predictions["logits"], targets["labels"])
-    
+
     def add_missing_hparams(self):
         # fix various attribute errors when instantiating via
         # load_from_checkpoint()
-        # like self.hparams.update() but do not overwrite 
+        # like self.hparams.update() but do not overwrite
         # values already set
         # TODO: check docs whether there is a parameter to
         #       request this behaviour from update()
@@ -770,12 +780,12 @@ class Classifier_part_3(Classifier_part_2):
 
 
 class Classifier_part_4(Classifier_part_3):
-    
+
     def prepare_sample(self, sample: list, prepare_target: bool = True) -> (dict, dict):
         """ prepare a batch of instances to pass them into the model
-        
+
         :param sample: list of dictionaries.
-        
+
         Returns:
             - dictionary with the expected model inputs.
             - dictionary with the expected target labels.
@@ -875,10 +885,10 @@ class Classifier_part_5(Classifier_part_4):
 from torch import optim
 
 class Classifier(Classifier_part_5):
-    
+
     # validation_end() is now validation_epoch_end()
     # https://github.com/PyTorchLightning/pytorch-lightning/blob/efd272a3cac2c412dd4a7aa138feafb2c114326f/CHANGELOG.md
-    
+
     def test_or_validation_epoch_end(self, test_type, outputs: list) -> None:
         ''' calculate average loss and accuracy over all batches,
             reducing the weight of the last batch according to its
@@ -911,10 +921,10 @@ class Classifier(Classifier_part_5):
 
     def validation_epoch_end(self, outputs: list) -> None:
         self.test_or_validation_epoch_end('val', outputs)
-                                     
+
     def test_epoch_end(self, outputs: list) -> None:
         self.test_or_validation_epoch_end('test', outputs)
-        
+
     def configure_optimizers(self):
         """ Sets different Learning rates for different parameter groups. """
         parameters = [
@@ -947,29 +957,27 @@ classifier = Classifier(
 )
 print('Ready.')
 
+if not skip_training:
 # https://pytorch-lightning.readthedocs.io/en/latest/common/early_stopping.html
+    from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+    from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
-import os
-import time
-
-early_stop_callback = EarlyStopping(
+    early_stop_callback = EarlyStopping(
     monitor   = 'val_acc',
     min_delta = 0.00,
     patience  = 7,
     verbose   = False,
     mode      = 'max',
-)
+    )
 
-save_top_model_callback = ModelCheckpoint(
+    save_top_model_callback = ModelCheckpoint(
     save_top_k = 3,
     monitor    = 'val_acc',
     mode       = 'max',
     filename   = '{val_acc:.4f}-{epoch:02d}-{val_loss:.4f}'
-)
+    )
 
-trainer = pl.Trainer(
+    trainer = pl.Trainer(
     callbacks=[early_stop_callback, save_top_model_callback],
     max_epochs = max_epochs,
     min_epochs = classifier.hparams.nr_frozen_epochs + 2,
@@ -979,22 +987,22 @@ trainer = pl.Trainer(
     check_val_every_n_epoch = 1,
     # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
     logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
-)
-
-start = time.time()
-trainer.fit(classifier, classifier.data)
-print('Training time: %.0f minutes' %((time.time()-start)/60.0))
+    )
 
 
-print('The best model is', save_top_model_callback.best_model_path)
+    start = time.time()
+    trainer.fit(classifier, classifier.data)
+    print('Training time: %.0f minutes' %((time.time()-start)/60.0))
 
-print('Best validation set accuracy:', save_top_model_callback.best_model_score)
+    print('The best model is', save_top_model_callback.best_model_path)
+
+    print('Best validation set accuracy:', save_top_model_callback.best_model_score)
 
 # The following automatically loads the best weights according to
 # https://pytorch-lightning.readthedocs.io/en/latest/common/lightning_module.html
 
-print('Test results via trainer.test():')
-results = trainer.test()  # also prints results as a side effect
+    print('Test results via trainer.test():')
+    results = trainer.test()  # also prints results as a side effect
 
 
 # 5.1 Save Best Model outside Logs
@@ -1005,40 +1013,41 @@ results = trainer.test()  # also prints results as a side effect
 # not a documented feature so to be on the safe side for future versions we
 # need to explicitly load the best checkpoint:
 
-best_model = Classifier.load_from_checkpoint(
+    best_model = Classifier.load_from_checkpoint(
     checkpoint_path = trainer.checkpoint_callback.best_model_path
     # the hparams including hparams.batch_size appear to have been
     # saved in the checkpoint automatically
-)
+    )
 # best_model.save_checkpoint('best.ckpt') does not exist
 # --> need to wrap model into trainer to be able to save a checkpoint
 
-new_trainer = pl.Trainer(
+    new_trainer = pl.Trainer(
     resume_from_checkpoint = trainer.checkpoint_callback.best_model_path,
     gpus = -1,  # avoid warnings (-1 = automatic selection)
     # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
     logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
-)
-new_trainer.model = best_model  # @model.setter in plugins/training_type/training_type_plugin.py
+    )
+    new_trainer.model = best_model  # @model.setter in plugins/training_type/training_type_plugin.py
 
-new_trainer.save_checkpoint(
+    new_trainer.save_checkpoint(
     "best-model-weights-only.ckpt",
     True,  # save_weights_only
     # (if saved with setting the 2nd arg to True, the checkpoint   # TODO: "False"?
     # will contain absoulte paths and training parameters)
-)
+    )
 
 # to just save the bert model in pytorch format and without the classification head, we follow
 # https://github.com/PyTorchLightning/pytorch-lightning/issues/3096#issuecomment-686877242
-best_model.bert.save_pretrained('best-bert-encoder.pt')
+    best_model.bert.save_pretrained('best-bert-encoder.pt')
 
 # TODO: the above only saves the BERT encoder, not the classification head
 
 # Since the lightning module inherits from pytorch, we can save the full network in
 # pytorch format:
-torch.save(best_model.state_dict(), 'best-model.pt')
+    torch.save(best_model.state_dict(), 'best-model.pt')
 
-print('Ready')
+    print('Ready')
+
 
 # 5.2 Load and Test Model
 
