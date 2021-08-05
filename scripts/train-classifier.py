@@ -417,11 +417,14 @@ class ABSA_Dataset_part_1(Dataset):
         raw_data,
         put_question_first = True,
         template_index = -1,    # -1 = pick random template
+        mask = None,            # 'I' = mask SE tokens, i.e. use other tokens only,
+                                # 'O' = mask other tokens, i.e. use SE tokens only
         info = None,            # additional info to keep with each instance
     ):
         self.raw_data            = raw_data
         self.put_question_first  = put_question_first
         self.template_index      = template_index
+        self.mask                = mask
         self.info                = info
 
     def __len__(self):
@@ -441,6 +444,7 @@ class ABSA_Dataset_part_1(Dataset):
         question, label = self.pick_question(
             entity_type, attribute_label, domain, polarity,
         )
+        tokens = self.apply_mask(tokens, sea)
         # TODO: support adding context (previous sentences) to text
         retval = {}
         if self.put_question_first:
@@ -451,6 +455,7 @@ class ABSA_Dataset_part_1(Dataset):
             retval['seq_B'] = question
         retval['label'] = label
         retval['domain'] = domain
+        retval['mask']  = self.mask
         retval['info']  = self.info
         return retval
 
@@ -477,6 +482,18 @@ class ABSA_Dataset(ABSA_Dataset_part_1):
         #  do not need to map back to tokens for the question)
         question = question.split()
         return (question, label)
+
+    def apply_mask(self, tokens, sea):
+        if not self.mask:
+            return tokens
+        retval = []
+        for index, token in enumerate(tokens):
+            if sea[index] == self.mask:
+                retval.append('[MASK]')
+            else:
+                retval.append(token)
+        return retval
+
 
 # wrap training and dev data
 
@@ -510,12 +527,14 @@ print('Devset size (using all templates):', len(dev_dataset_combined))
 # create a separate test set for each question template
 
 te_dataset_objects = []
-for template_index in range(len(templates)):
-    te_dataset_objects.append(ABSA_Dataset(
-        te_dataset,
-        put_question_first = put_question_first,
-        template_index = template_index,
-    ))
+for mask in (None, 'O', 'I'):
+    for template_index in range(len(templates)):
+        te_dataset_objects.append(ABSA_Dataset(
+            te_dataset,
+            put_question_first = put_question_first,
+            template_index = template_index,
+            mask = mask,
+        ))
 
 # also provide a test set that is the union of the above test sets
 
@@ -1060,6 +1079,7 @@ def get_subset_by_domain(dataset_object, domain):
 
 summary = []
 header = []
+header.append('SeqB')
 header.append('Q')
 header.append('Overall')
 if len(domains) > 1:
@@ -1067,12 +1087,22 @@ if len(domains) > 1:
         header.append(domain.title())
 header.append('Description')
 summary.append('\t'.join(header))
+
+mask2seqb = {
+    None: 'Full',
+    'O':  'SE',
+    'I':  'Other',
+}
+
 for te_index, te_dataset_object in enumerate(te_dataset_objects):
+    template_index = te_index % len(templates)
     row = []
-    row.append('%d' %te_index)
-    print('\nQuestion template %d: %r' %(te_index, templates[te_index]['question']))
+    row.append(mask2seqb[te_dataset_object.mask])
+    row.append('%d' %template_index)
+    question = templates[template_index]['question']
+    print('\nQuestion template %d: %r' %(te_index, question))
     score = 100.0 * test_and_print(te_dataset_object)
-    row.append('%.1f' %score)
+    row.append('%.9f' %score)
     if len(domains) > 1:
         print('\nBreakdown by domain:')
         for domain in sorted(list(domains)):
@@ -1080,9 +1110,9 @@ for te_index, te_dataset_object in enumerate(te_dataset_objects):
             score = 100.0 * test_and_print(
                 get_subset_by_domain(te_dataset_object, domain)
             )
-            row.append('%.1f' %score)
+            row.append('%.9f' %score)
     print()
-    row.append(templates[te_index]['description'])
+    row.append(templates[template_index]['description'])
     summary.append('\t'.join(row))
 print('\nSummary:')
 print('\n'.join(summary))
