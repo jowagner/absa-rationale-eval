@@ -31,11 +31,13 @@ else:
 
 training_task = sys.argv[3]
 if training_task == 'Full':     # sequence B is the review sentence as is
-    training_mask = None
+    training_masks = [None]
 elif training_task == 'SE':     # sequence B is only the sentiment expression, all other words are masked
-    training_mask = 'O'
+    training_masks = ['O']
 elif training_task == 'Other':  # sequence B is all but the SE (the SE words are masked)
-    training_mask = 'I'
+    training_masks = ['I']
+elif training_task == 'All':    # concatenation of above training sets
+    training_masks = [None, 'O', 'I']
 else:
     raise ValueError('unknown training task %s' %training_task)
 
@@ -517,26 +519,30 @@ class ABSA_Dataset(ABSA_Dataset_part_1):
 
 # wrap training and dev data
 
-tr_dataset_object = ABSA_Dataset(
-    tr_dataset,
-    put_question_first = put_question_first,
-    template_index = -1,  # pick question at random
-    mask = training_mask,
-)
+tr_dataset_objects = []
+for training_mask in training_masks:
+    tr_dataset_objects.append(ABSA_Dataset(
+        tr_dataset,
+        put_question_first = put_question_first,
+        template_index = -1,  # pick question at random
+        mask = training_mask,
+    ))
+tr_dataset_object = torch.utils.data.ConcatDataset(tr_dataset_objects)
 
 print('Training size:', len(tr_dataset_object))
 
 # create a separate dev set for each question template
 
 dev_dataset_objects = []
-for template_index in range(len(templates)):
-    dev_dataset_objects.append(ABSA_Dataset(
-        dev_dataset,
-        put_question_first = put_question_first,
-        template_index = template_index,
-        mask = training_mask,    # e.g. if we train on SE data we want to
-                                 # pick the model according to the SE score
-    ))
+for training_mask in training_masks:
+    for template_index in range(len(templates)):
+        dev_dataset_objects.append(ABSA_Dataset(
+            dev_dataset,
+            put_question_first = put_question_first,
+            template_index = template_index,
+            mask = training_mask,    # e.g. if we train on SE data we want to
+                                     # pick the model according to the SE score
+        ))
 
 # also provide a dev set that is the union of the above dev sets,
 # e.g. to be used for model selection
