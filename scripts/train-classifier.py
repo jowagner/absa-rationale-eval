@@ -1143,5 +1143,163 @@ for te_index, te_dataset_object in enumerate(te_dataset_objects):
 print('\nSummary:')
 print('\n'.join(summary))
 
+# Saliency maps for dev and test data
 
+# 6.1 Copy of Test Data with Prediction as Label
+#
+#     We create datasets annotated with the predicted label so the
+#     gradient can be easily calculated for the predicted label
+#     instead of the gold label.
+
+# TODO
+
+
+# 6.2 Get Input Gradient
+
+def get_embedding_layer(model):
+    return model.bert.embeddings
+    #return model.bert.embeddings.word_embeddings
+
+# EMNLP 2020 interpretatibility video at 3:09:52
+# with modifications to 
+
+def get_gradients(model, instances, labels):
+    embedding_gradients = []
+    def grad_hook(module, grad_in, grad_out):
+        embedding_gradients.append(grad_out[0])
+    embedding = get_embedding_layer(model)
+    handle = embedding.register_full_backward_hook(grad_hook)
+    try:
+        predictions = model(instances)
+        # TODO: should we use "logits" directly to
+        #       "avoid saturation issues"?
+        loss = model.loss(predictions, labels)
+        loss.backward()
+    except:
+        handle.remove()
+        raise Exception
+    handle.remove()
+    return embedding_gradients
+
+best_model.unfreeze_encoder()   # otherwise gradients will not arrive at embedding layer
+
+sample = []
+for i in range(min(batch_size, 3)):
+    sample.append(pred_dataset_objects[0][i])   # [0] = "Full" set
+
+finalised_instance, labels = best_model.prepare_sample(
+    sample = sample,
+    prepare_target = True
+)
+print('Ready')
+
+# this seems to be running CPU-only by default
+
+gradients = get_gradients(best_model, finalised_instance, labels)
+
+print(len(gradients))
+print(gradients[0].shape)
+
+# next step is then at 3:12:38 to add a forward hook and calculate the saliencies
+
+import numpy
+
+def dot_and_normalise(gradients, forward_embeddings):
+    # https://discuss.pytorch.org/t/how-to-do-elementwise-multiplication-of-two-vectors/13182
+    products = gradients * forward_embeddings
+    # adjusted from
+    # https://github.com/PAIR-code/lit/blob/main/lit_nlp/components/gradient_maps.py
+    # GradientNorm._interpret()
+    norms = torch.linalg.norm(products, axis=2)
+    sums_of_norms = torch.sum(norms, 1)
+    assert len(sums_of_norms.shape) == 1
+    # https://discuss.pytorch.org/t/tensor-division-in-batches/18392
+    broadcasted_sums = sums_of_norms.view(sums_of_norms.shape[0], 1)
+    normalised_norms = norms / broadcasted_sums
+    return normalised_norms # , norms, products
+    
+def get_alphas(variant):
+    if variant == 'integrated':
+        return numpy.linspace(0, 1, num=25)
+    elif variant == 'point':
+        return [1]
+    elif variant == 'short line':
+        return numpy.linspace(0.95, 1.05, num=15)
+    else:
+        raise ValueError('gradient-based saliency maps with %s not implemented' %variant)
+
+# bug in the code presented in the tutorial:
+#  * the stored forward embedding is multiplied by 0, causing the dot product
+#    to be 0 as well and the normalised saliency values to be NaN (0/0);
+#    we fix this by storing the embedding for alpha == 1 instead of
+#    alpha == 0
+
+def interpret(model, instances, labels, variant = 'integrated'):
+    forward_embeddings = []
+    gradients = []
+    for alpha in get_alphas(variant):
+        def forward_hook(module, inputs, outputs):
+            if alpha == 1:
+                forward_embeddings.append(outputs)
+            else:
+                outputs.mul_(alpha)
+        embedding = get_embedding_layer(model)
+        try:
+            handle = embedding.register_forward_hook(forward_hook)
+            gradients.append(get_gradients(model, instances, labels))
+            handle.remove()
+        except:
+            handle.remove()
+            raise Exception
+    assert len(forward_embeddings) == 1
+    forward_embeddings = forward_embeddings[0]
+    # average over all the gradients obtained with different alpha values
+    mean_gradients = []
+    for gradient_batch in zip(*gradients):
+        stack_of_gradients = torch.stack(gradient_batch)
+        mean_gradients.append(torch.mean(stack_of_gradients, 0))
+    assert len(mean_gradients) == 1
+    mean_gradients = mean_gradients[0]
+    return dot_and_normalise(
+        mean_gradients,
+        forward_embeddings,
+    )
+
+s = interpret(
+    best_model, finalised_instance, labels,
+    variant = 'short line'
+)
+print('shape of saliencies:', s.shape)
+
+# display salience maps (plain text)
+
+n = labels['labels'].shape[0]
+print('n =', n)
+for j in range(n):
+    tokens = finalised_instance[j].tokens
+    tokens = tokens[:tokens.index('[PAD]')]
+    print(j, ' '.join(tokens))
+    scores = []
+    m = len(tokens)
+    for i in range(m):
+        scores.append((-s[j][i].item(), i))
+    scores.sort()
+    top_i = []
+    for _, i in scores:
+        top_i.append(i)
+    start = tokens.index('[SEP]')
+    total = 0.0
+    for i in range(start+1, m-1):
+        score = s[j][i].item()
+        top = top_i.index(i)
+        if top < 5:
+            top = '%4d' %(1+top)
+        else:
+            top = ''    
+        print('%s\t%4.1f\t%s' %(top, (100.0*score), finalised_instance[j].tokens[i]))
+        total += score
+    print('total\t%4.1f\t(remaining %4.1f are outside seq B)' %(100.0*total, 100.0*(1.0-total)))
+    print()
+
+print(list(map(lambda x: x[1], scores)))  # show indices of top scoring tokens for last example
 
