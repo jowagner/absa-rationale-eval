@@ -432,7 +432,7 @@ print('Development data size:', len(dev_dataset))
 import torch
 from torch.utils.data import Dataset, DataLoader, RandomSampler
 
-class ABSA_Dataset_part_1(Dataset):
+class ABSA_Dataset(Dataset):
 
     def __init__(
         self,
@@ -479,10 +479,8 @@ class ABSA_Dataset_part_1(Dataset):
         retval['domain'] = domain
         retval['mask']  = self.mask
         retval['info']  = self.info
+        retval['index'] = idx
         return retval
-
-
-class ABSA_Dataset(ABSA_Dataset_part_1):
 
     def pick_question(self, entity_type, attribute_label, domain, polarity):
         global templates
@@ -526,6 +524,7 @@ for training_mask in training_masks:
         put_question_first = put_question_first,
         template_index = -1,  # pick question at random
         mask = training_mask,
+        info = 's%d' %seed
     ))
 tr_dataset_object = torch.utils.data.ConcatDataset(tr_dataset_objects)
 
@@ -542,6 +541,7 @@ for training_mask in training_masks:
             template_index = template_index,
             mask = training_mask,    # e.g. if we train on SE data we want to
                                      # pick the model according to the SE score
+            info = 's%d,q%d' %(seed, template_index)
         ))
 
 # also provide a dev set that is the union of the above dev sets,
@@ -563,6 +563,7 @@ for mask in (None, 'O', 'I'):
             put_question_first = put_question_first,
             template_index = template_index,
             mask = mask,
+            info = 'q%d' %template_index
         ))
 
 # also provide a test set that is the union of the above test sets
@@ -636,8 +637,12 @@ class ABSA_DataModule(pl.LightningDataModule):
 
 from transformers import AutoModel
 import torch.nn as nn
+import logging as log
+from torchnlp.utils import lengths_to_mask
+from collections import OrderedDict
+from torch import optim
 
-class Classifier_part_1(pl.LightningModule):
+class Classifier(pl.LightningModule):
 
     #def __init__(self, hparams = None, **kwargs) -> None:
     def __init__(self, hparams = None, **kwargs) -> None:
@@ -694,10 +699,6 @@ class Classifier_part_1(pl.LightningModule):
     def __build_loss(self):
         self._loss = nn.CrossEntropyLoss()
 
-import logging as log
-
-class Classifier_part_2(Classifier_part_1):
-
     def unfreeze_encoder(self) -> None:
         if self._frozen:
             log.info('\n== Encoder model fine-tuning ==')
@@ -743,11 +744,6 @@ class Classifier_part_2(Classifier_part_1):
 
     def reset_recorded_predictions(self):
         self.seq2label = {}
-
-
-from torchnlp.utils import lengths_to_mask
-
-class Classifier_part_3(Classifier_part_2):
 
     def forward(self, batch_input):
         tokens  = batch_input['input_ids']
@@ -796,10 +792,6 @@ class Classifier_part_3(Classifier_part_2):
             if not hasattr(self.hparams, key):
                 self.hparams[key] = hparams[key]
 
-
-
-class Classifier_part_4(Classifier_part_3):
-
     def prepare_sample(self, sample: list, prepare_target: bool = True) -> (dict, dict):
         """ prepare a batch of instances to pass them into the model
 
@@ -840,13 +832,6 @@ class Classifier_part_4(Classifier_part_3):
             return encoded_batch, targets
         except RuntimeError:
             raise Exception("Label encoder found an unknown label.")
-
-
-
-
-from collections import OrderedDict
-
-class Classifier_part_5(Classifier_part_4):
 
     def training_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
         ''' perform a training step with the given batch '''
@@ -898,12 +883,6 @@ class Classifier_part_5(Classifier_part_4):
         return self.test_or_validation_step(
             'test', batch, batch_nb, *args, **kwargs
         )
-
-
-
-from torch import optim
-
-class Classifier(Classifier_part_5):
 
     # validation_end() is now validation_epoch_end()
     # https://github.com/PyTorchLightning/pytorch-lightning/blob/efd272a3cac2c412dd4a7aa138feafb2c114326f/CHANGELOG.md
@@ -1161,7 +1140,7 @@ def get_embedding_layer(model):
     #return model.bert.embeddings.word_embeddings
 
 # EMNLP 2020 interpretatibility video at 3:09:52
-# with modifications to 
+# with modifications to
 
 def get_gradients(model, instances, labels):
     embedding_gradients = []
@@ -1183,22 +1162,8 @@ def get_gradients(model, instances, labels):
 
 best_model.unfreeze_encoder()   # otherwise gradients will not arrive at embedding layer
 
-sample = []
-for i in range(min(batch_size, 3)):
-    sample.append(pred_dataset_objects[0][i])   # [0] = "Full" set
-
-finalised_instance, labels = best_model.prepare_sample(
-    sample = sample,
-    prepare_target = True
-)
-print('Ready')
-
 # this seems to be running CPU-only by default
 
-gradients = get_gradients(best_model, finalised_instance, labels)
-
-print(len(gradients))
-print(gradients[0].shape)
 
 # next step is then at 3:12:38 to add a forward hook and calculate the saliencies
 
@@ -1217,7 +1182,7 @@ def dot_and_normalise(gradients, forward_embeddings):
     broadcasted_sums = sums_of_norms.view(sums_of_norms.shape[0], 1)
     normalised_norms = norms / broadcasted_sums
     return normalised_norms # , norms, products
-    
+
 def get_alphas(variant):
     if variant == 'integrated':
         return numpy.linspace(0, 1, num=25)
@@ -1265,41 +1230,85 @@ def interpret(model, instances, labels, variant = 'integrated'):
         forward_embeddings,
     )
 
-s = interpret(
-    best_model, finalised_instance, labels,
-    variant = 'short line'
-)
-print('shape of saliencies:', s.shape)
+def get_dev_and_test_instances():
+    global dev_dataset_combined
+    global te_dataset_combined
+    for test_type, test_set in [
+        ('dev',  dev_dataset_combined),
+        ('test', te_dataset_combined),
+    ]:
+        for index, item in enumerate(test_set):
+            item['test_type'] = test_type
+            yield item
 
-# display salience maps (plain text)
+def get_batches_for_saliency():
+    batch = []
+    for item in get_dev_and_test_instances():
+        next_batch.append(item)
+        if len(batch) == batch_size:
+            yield prepare_batch_for_salience(batch)
+            batch = []
+    if batch:
+        yield prepare_batch_for_salience(batch)
 
-n = labels['labels'].shape[0]
-print('n =', n)
-for j in range(n):
-    tokens = finalised_instance[j].tokens
-    tokens = tokens[:tokens.index('[PAD]')]
-    print(j, ' '.join(tokens))
-    scores = []
-    m = len(tokens)
-    for i in range(m):
-        scores.append((-s[j][i].item(), i))
-    scores.sort()
-    top_i = []
-    for _, i in scores:
-        top_i.append(i)
-    start = tokens.index('[SEP]')
-    total = 0.0
-    for i in range(start+1, m-1):
-        score = s[j][i].item()
-        top = top_i.index(i)
-        if top < 5:
-            top = '%4d' %(1+top)
-        else:
-            top = ''    
-        print('%s\t%4.1f\t%s' %(top, (100.0*score), finalised_instance[j].tokens[i]))
-        total += score
-    print('total\t%4.1f\t(remaining %4.1f are outside seq B)' %(100.0*total, 100.0*(1.0-total)))
-    print()
+def prepare_batch_for_salience(batch, model):
+    # (1) get predictions
+    finalsed_instances, _ = model.prepare_sample(batch)
+    predictions = model(finalsed_instances)
+    # (2) update labels without changing gold label
+    #     (if label is different, make a copy of the dictionary
+    #     and change it only in the copy, making a new batch)
+    new_batch = []
+    updated = 0
+    for index, item in enumerate(batch):
+        prediction = predictions[index]
+        if prediction != item['label']:
+            item = item.copy()
+            item['label'] = prediction
+            updated += 1
+        new_batch.append(item)
+    print('Saliency batch of %d needed %d label updates.' %(len(batch), updated))
+    return new_batch
 
-print(list(map(lambda x: x[1], scores)))  # show indices of top scoring tokens for last example
+for batch in get_batches_for_saliency():
+    finalised_instance, labels = best_model.prepare_sample(
+        sample = batch,
+        prepare_target = True
+    )
+    s = interpret(
+        best_model, finalised_instance, labels,
+        variant = 'short line'
+    )
+    print('shape of saliencies:', s.shape)
+
+    # display salience maps (plain text)
+
+    n = labels['labels'].shape[0]
+    print('n =', n)
+    for j in range(n):
+        tokens = finalised_instance[j].tokens
+        tokens = tokens[:tokens.index('[PAD]')]
+        print(j, ' '.join(tokens))
+        scores = []
+        m = len(tokens)
+        for i in range(m):
+            scores.append((-s[j][i].item(), i))
+        scores.sort()
+        top_i = []
+        for _, i in scores:
+            top_i.append(i)
+        start = tokens.index('[SEP]')
+        total = 0.0
+        for i in range(start+1, m-1):
+            score = s[j][i].item()
+            top = top_i.index(i)
+            if top < 5:
+                top = '%4d' %(1+top)
+            else:
+                top = ''
+            print('%s\t%4.1f\t%s' %(top, (100.0*score), finalised_instance[j].tokens[i]))
+            total += score
+        print('total\t%4.1f\t(remaining %4.1f are outside seq B)' %(100.0*total, 100.0*(1.0-total)))
+        print()
+        print(list(map(lambda x: x[1], scores)))  # show indices of top scoring tokens for last example
 
