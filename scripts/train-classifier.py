@@ -24,8 +24,13 @@ np.random.seed(seed)
 command = sys.argv[2]
 if command == 'train':
     skip_training = False
+    skip_evaluation = False
 elif command == 'eval':
     skip_training = True
+    skip_evaluation = False
+elif command == 'saliency':
+    skip_training = True
+    skip_evaluation = True
 else:
     raise ValueError('unknown command %s' %command)
 
@@ -1100,6 +1105,8 @@ mask2seqb = {
 }
 
 for te_index, te_dataset_object in enumerate(te_dataset_objects):
+    if skip_evaluation:
+        break
     template_index = te_index % len(templates)
     row = []
     row.append(mask2seqb[te_dataset_object.mask])
@@ -1119,8 +1126,9 @@ for te_index, te_dataset_object in enumerate(te_dataset_objects):
     print()
     row.append(templates[template_index]['description'])
     summary.append('\t'.join(row))
-print('\nSummary:')
-print('\n'.join(summary))
+if not skip_evaluation:
+    print('\nSummary:')
+    print('\n'.join(summary))
 
 # Saliency maps for dev and test data
 
@@ -1241,15 +1249,15 @@ def get_dev_and_test_instances():
             item['test_type'] = test_type
             yield item
 
-def get_batches_for_saliency():
+def get_batches_for_saliency(model):
     batch = []
     for item in get_dev_and_test_instances():
-        next_batch.append(item)
+        batch.append(item)
         if len(batch) == batch_size:
-            yield prepare_batch_for_salience(batch)
+            yield prepare_batch_for_salience(batch, model)
             batch = []
     if batch:
-        yield prepare_batch_for_salience(batch)
+        yield prepare_batch_for_salience(batch, model)
 
 def prepare_batch_for_salience(batch, model):
     # (1) get predictions
@@ -1270,7 +1278,7 @@ def prepare_batch_for_salience(batch, model):
     print('Saliency batch of %d needed %d label updates.' %(len(batch), updated))
     return new_batch
 
-for batch in get_batches_for_saliency():
+for batch in get_batches_for_saliency(best_model):
     finalised_instance, labels = best_model.prepare_sample(
         sample = batch,
         prepare_target = True
