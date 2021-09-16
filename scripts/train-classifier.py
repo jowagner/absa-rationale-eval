@@ -1261,8 +1261,18 @@ def get_batches_for_saliency(model):
 
 def prepare_batch_for_salience(batch, model):
     # (1) get predictions
-    finalsed_instances, _ = model.prepare_sample(batch)
-    predictions = model(finalsed_instances)
+    #     (following ABSA_Classifier.predict())
+    with torch.no_grad():
+        finalsed_instances, _ = model.prepare_sample(
+            batch, prepare_target = False,
+        )
+        model_out = model(finalsed_instances)
+        logits = torch.Tensor.cpu(model_out["logits"]).numpy()
+        predictions = [
+            model.data.label_encoder.index_to_token[prediction]
+            for prediction in numpy.argmax(logits, axis=1)
+        ]
+        #print(predictions)
     # (2) update labels without changing gold label
     #     (if label is different, make a copy of the dictionary
     #     and change it only in the copy, making a new batch)
@@ -1277,6 +1287,10 @@ def prepare_batch_for_salience(batch, model):
         new_batch.append(item)
     print('Saliency batch of %d needed %d label updates.' %(len(batch), updated))
     return new_batch
+
+if best_model.tokenizer is None:
+    #print('setting tokeniser')
+    best_model.tokenizer = tokeniser
 
 for batch in get_batches_for_saliency(best_model):
     finalised_instance, labels = best_model.prepare_sample(
