@@ -1260,6 +1260,7 @@ def get_batches_for_saliency(model):
         yield prepare_batch_for_salience(batch, model)
 
 def prepare_batch_for_salience(batch, model):
+    start_t = time.time()
     # (1) get predictions
     #     (following ABSA_Classifier.predict())
     with torch.no_grad():
@@ -1272,20 +1273,21 @@ def prepare_batch_for_salience(batch, model):
             model.data.label_encoder.index_to_token[prediction]
             for prediction in numpy.argmax(logits, axis=1)
         ]
-        #print(predictions)
     # (2) update labels without changing gold label
     #     (if label is different, make a copy of the dictionary
     #     and change it only in the copy, making a new batch)
     new_batch = []
     updated = 0
     for index, item in enumerate(batch):
+        item['gold'] = item['label']
         prediction = predictions[index]
         if prediction != item['label']:
             item = item.copy()
             item['label'] = prediction
             updated += 1
         new_batch.append(item)
-    print('Saliency batch of %d needed %d label updates.' %(len(batch), updated))
+    print('Saliency batch of %d needed %d label update(s).' %(len(batch), updated))
+    print('Spent %.1f seconds on batch preparation.' %(time.time() - start_t))
     return new_batch
 
 if best_model.tokenizer is None:
@@ -1293,44 +1295,77 @@ if best_model.tokenizer is None:
     best_model.tokenizer = tokeniser
 
 for batch in get_batches_for_saliency(best_model):
+    start_t = time.time()
     finalised_instance, labels = best_model.prepare_sample(
         sample = batch,
         prepare_target = True
     )
+    print('Spent %.1f seconds on batch finalisation.' %(time.time() - start_t))
+    start_t = time.time()
     s = interpret(
         best_model, finalised_instance, labels,
         variant = 'short line'
     )
-    print('shape of saliencies:', s.shape)
+    print('Spent %.1f seconds on obtaining saliency scores.' %(time.time() - start_t))
+    #print('shape of saliencies:', s.shape)
 
     # display salience maps (plain text)
 
     n = labels['labels'].shape[0]
     print('n =', n)
     for j in range(n):
+        batch_item = batch[j]
+        info = batch_item['info'].split(',')
+        if len(info) == 2:
+            seed, question = info
+        elif info[0].startswith('s'):
+            seed = info[0]
+            question = '-'
+        elif info[0].startswith('a'):
+            seed = '-'
+            question = info[0]
+        else:
+            raise ValueError('unsupported info %r for batch index %d' %(info, j))
+        print()
+        print('\t'.join('seed question set index domain mask gold pred'.split()))
+        print('\t'.join([
+            seed, question,
+            batch_item['test_type'],
+            '%d' %batch_item['index'],
+            batch_item['domain'],
+            'None' if batch_item['mask'] is None else batch_item['mask'],
+            batch_item['gold'],
+            batch_item['label'],
+        ]))
         tokens = finalised_instance[j].tokens
-        tokens = tokens[:tokens.index('[PAD]')]
-        print(j, ' '.join(tokens))
+        start_seqB = tokens.index('[SEP]') + 1
+        end_seqB   = tokens.index('[PAD]') - 1
+        tokens = tokens[:end_seqB + 1]
+        print('Subword units:', ' '.join(tokens))
         scores = []
-        m = len(tokens)
-        for i in range(m):
-            scores.append((-s[j][i].item(), i))
+        total_pad = 0.0
+        total_other = 0.0
+        for i in range(s.shape[1]):
+            score = s[j][i].item()
+            if i < start_seqB:
+                total_other += score
+            elif i < end_seqB:
+                scores.append((score, i))
+            else:
+                total_pad += score
+        print('Scores:', scores)
         scores.sort()
-        top_i = []
+        total_seqB = sum(map(lambda x: x[0], scores))
+        scores.reverse()
+        top_i = list(map(lambda x: x[1], scores))
         for _, i in scores:
             top_i.append(i)
-        start = tokens.index('[SEP]')
-        total = 0.0
-        for i in range(start+1, m-1):
+        for i in range(start_seqB, end_seqB):
             score = s[j][i].item()
             top = top_i.index(i)
-            if top < 5:
-                top = '%4d' %(1+top)
-            else:
-                top = ''
-            print('%s\t%4.1f\t%s' %(top, (100.0*score), finalised_instance[j].tokens[i]))
-            total += score
-        print('total\t%4.1f\t(remaining %4.1f are outside seq B)' %(100.0*total, 100.0*(1.0-total)))
-        print()
-        print(list(map(lambda x: x[1], scores)))  # show indices of top scoring tokens for last example
-
+            top = '%4d' %(1+top)
+            print('%s\t%9.6f\t%9.6f\t%s' %(top, (100.0*score), (100.0*score/total_seqB), tokens[i]))
+        print('total\t%4.1f\t(remaining %.6f are outside seq B, %.6f before and %.6f after)' %(
+            100.0*total_seqB, 100.0*(1.0-total_seqB),
+            100.0*total_other, 100.0*total_pad,
+        ))
