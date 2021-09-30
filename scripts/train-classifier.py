@@ -485,6 +485,8 @@ class ABSA_Dataset(Dataset):
         retval['mask']  = self.mask
         retval['info']  = self.info
         retval['index'] = idx
+        retval['tokens'] = tokens
+        retval['sea']   = sea
         return retval
 
     def pick_question(self, entity_type, attribute_label, domain, polarity):
@@ -1295,6 +1297,7 @@ if best_model.tokenizer is None:
     best_model.tokenizer = tokeniser
 
 for batch in get_batches_for_saliency(best_model):
+    print('\n\n== Batch ==\n')
     start_t = time.time()
     finalised_instance, labels = best_model.prepare_sample(
         sample = batch,
@@ -1311,9 +1314,11 @@ for batch in get_batches_for_saliency(best_model):
 
     # display salience maps (plain text)
 
+    start_t = time.time()
     n = labels['labels'].shape[0]
     print('n =', n)
     for j in range(n):
+        print('\n\n=== Item ===\n')
         batch_item = batch[j]
         info = batch_item['info'].split(',')
         if len(info) == 2:
@@ -1321,7 +1326,7 @@ for batch in get_batches_for_saliency(best_model):
         elif info[0].startswith('s'):
             seed = info[0]
             question = '-'
-        elif info[0].startswith('a'):
+        elif info[0].startswith('q'):
             seed = '-'
             question = info[0]
         else:
@@ -1354,12 +1359,14 @@ for batch in get_batches_for_saliency(best_model):
             else:
                 total_pad += score
         print('Scores:', scores)
+        print()
         scores.sort()
         total_seqB = sum(map(lambda x: x[0], scores))
         scores.reverse()
         top_i = list(map(lambda x: x[1], scores))
         for _, i in scores:
             top_i.append(i)
+        sea = batch_item['sea']
         for i in range(start_seqB, end_seqB):
             score = s[j][i].item()
             top = top_i.index(i)
@@ -1369,3 +1376,34 @@ for batch in get_batches_for_saliency(best_model):
             100.0*total_seqB, 100.0*(1.0-total_seqB),
             100.0*total_other, 100.0*total_pad,
         ))
+        print()
+        # show evaluation metrics for every possible rationale length
+        print('\t'.join("""RationaleLength Percentage True-Negatives False-Positives False-Negatives
+        True-Positives Precision Recall F-Score Accuracy""".split()))
+        rationale = set()
+        length2confusions = {}
+        length2confusions[0] = confusion_matrix(sea, rationale)
+        for score, index in scores:
+            # add token to rationale
+            rationale.add(get_token_index_for_subword_index(index))
+            length = len(rationale)
+            if length not in length2confusions:
+                # found a new rationale
+                # --> get confusion matrix for this rationale
+                length2confusions[length] = confusion_matrix(sea, rationale)
+            assert length + 1 == len(length2confusions)
+        assert len(rationale) == len(sea)  # last rationale should cover all tokens
+        for length in sorted(list(length2confusions.keys())):
+            row = []
+            row.append('%4d' %length)
+            row.append('%9.6f' %(100.0*length/float(len(sea))))
+            tn, fp, fn, tp = length2confusions[length]
+            row.append('%d' %tn)
+            row.append('%d' %fp)
+            row.append('%d' %fn)
+            row.append('%d' %tp)
+            # TODO: calc derived metrics
+            print('\t'.join(row))
+    print()
+    print('Spent %.1f seconds on printing tables.' %(time.time() - start_t))
+    sys.stdout.flush()
