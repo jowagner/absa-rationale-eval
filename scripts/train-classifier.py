@@ -1296,7 +1296,34 @@ if best_model.tokenizer is None:
     #print('setting tokeniser')
     best_model.tokenizer = tokeniser
 
+def get_confusion_matrix(sea, rationale):
+    tn, fp, fn, tp = 0, 0, 0, 0
+    for index, annotation in enumerate(sea):
+        if annotation == 'I' and index in rationale:
+            tp += 1
+        elif annotation == 'I':
+            fn += 1
+        elif annotation == 'O' and index in rationale:
+            fp += 1
+        elif annotation == 'O':
+            tn += 1
+        else:
+            raise ValueError('Unsupported SEA annotation %r at index %d' %(annotation, index))
+    return tn, fp, fn, tp
+
+
+def get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index):
+    assert start_seqB <= index < end_seqB
+    word_id_q = word_ids[index]
+    word_id_0 = word_ids[start_seqB]
+    assert word_id_q is not None
+    assert word_id_0 is not None
+    return word_id_q - word_id_0
+
+summaries = {}
+
 for batch in get_batches_for_saliency(best_model):
+    summaries_updated_in_batch = set()
     print('\n\n== Batch ==\n')
     start_t = time.time()
     finalised_instance, labels = best_model.prepare_sample(
@@ -1320,6 +1347,7 @@ for batch in get_batches_for_saliency(best_model):
     for j in range(n):
         print('\n\n=== Item ===\n')
         batch_item = batch[j]
+        word_ids = finalised_instance.word_ids(batch_index = j)
         info = batch_item['info'].split(',')
         if len(info) == 2:
             seed, question = info
@@ -1331,8 +1359,12 @@ for batch in get_batches_for_saliency(best_model):
             question = info[0]
         else:
             raise ValueError('unsupported info %r for batch index %d' %(info, j))
-        print()
-        print('\t'.join('seed question set index domain mask gold pred'.split()))
+        tokens = finalised_instance[j].tokens
+        start_seqB = tokens.index('[SEP]') + 1
+        end_seqB   = tokens.index('[PAD]') - 1
+        tokens = tokens[:end_seqB + 1]
+        sea = batch_item['sea']
+        print('\t'.join('seed question set index domain mask gold pred tokens subwords SEA-I SEA-O SEA-percentage'.split()))
         print('\t'.join([
             seed, question,
             batch_item['test_type'],
@@ -1341,11 +1373,13 @@ for batch in get_batches_for_saliency(best_model):
             'None' if batch_item['mask'] is None else batch_item['mask'],
             batch_item['gold'],
             batch_item['label'],
+            '%d' %(len(sea)),
+            '%d' %(end_seqB - start_seqB),
+            '%d' %(sea.count('I')),
+            '%d' %(sea.count('O')),
+            '%14.9f' %(100.0*sea.count('I')/float(len(sea))),
         ]))
-        tokens = finalised_instance[j].tokens
-        start_seqB = tokens.index('[SEP]') + 1
-        end_seqB   = tokens.index('[PAD]') - 1
-        tokens = tokens[:end_seqB + 1]
+        print()
         print('Subword units:', ' '.join(tokens))
         scores = []
         total_pad = 0.0
@@ -1366,15 +1400,21 @@ for batch in get_batches_for_saliency(best_model):
         top_i = list(map(lambda x: x[1], scores))
         for _, i in scores:
             top_i.append(i)
-        sea = batch_item['sea']
         for i in range(start_seqB, end_seqB):
             score = s[j][i].item()
             top = top_i.index(i)
+            sea_index = get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, i)
             top = '%4d' %(1+top)
-            print('%s\t%9.6f\t%9.6f\t%s' %(top, (100.0*score), (100.0*score/total_seqB), tokens[i]))
-        print('total\t%4.1f\t(remaining %.6f are outside seq B, %.6f before and %.6f after)' %(
+            print('%s\t%14.9f\t%14.9f\t%r\t%s' %(
+                top, (100.0*score), (100.0*score/total_seqB),
+                sea[sea_index],
+                tokens[i],
+            ))
+        print('total\t%14.9f\n\noutside seq B\t%14.9f\nbefore\t%14.9f\nafter\t%14.9f\nfirst SEP\t%14.9f\nsecond SEP\t%14.9f' %(
             100.0*total_seqB, 100.0*(1.0-total_seqB),
             100.0*total_other, 100.0*total_pad,
+            100.0*s[j][start_seqB-1],
+            100.0*s[j][end_seqB],
         ))
         print()
         # show evaluation metrics for every possible rationale length
@@ -1382,28 +1422,135 @@ for batch in get_batches_for_saliency(best_model):
         True-Positives Precision Recall F-Score Accuracy""".split()))
         rationale = set()
         length2confusions = {}
-        length2confusions[0] = confusion_matrix(sea, rationale)
+        length2confusions[0] = get_confusion_matrix(sea, rationale)
         for score, index in scores:
             # add token to rationale
-            rationale.add(get_token_index_for_subword_index(index))
+            rationale.add(get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index))
             length = len(rationale)
             if length not in length2confusions:
                 # found a new rationale
                 # --> get confusion matrix for this rationale
-                length2confusions[length] = confusion_matrix(sea, rationale)
+                length2confusions[length] = get_confusion_matrix(sea, rationale)
             assert length + 1 == len(length2confusions)
         assert len(rationale) == len(sea)  # last rationale should cover all tokens
-        for length in sorted(list(length2confusions.keys())):
+        # prepare storing cumulative stats for evaluation scores for full data sets
+        summary_key = (seed, question, batch_item['test_type'], batch_item['domain'], batch_item['mask'])
+        if summary_key not in summaries:
+            summaries[summary_key] = {}
+            summary = summaries[summary_key]
+            for threshold in range(1001):
+                d = []
+                for _ in range(4):
+                    d.append(0)
+                for _ in range(12):
+                    d.append(0.0)
+                d.append(0)
+                d.append(0)
+                summary[threshold] = d
+        summary = summaries[summary_key]
+        data = []
+        # print and collect stats for every possible rationale length
+        for length, length2 in enumerate(sorted(list(length2confusions.keys()))):
+            assert length == length2
             row = []
             row.append('%4d' %length)
-            row.append('%9.6f' %(100.0*length/float(len(sea))))
+            row.append('%14.9f' %(100.0*length/float(len(sea))))
             tn, fp, fn, tp = length2confusions[length]
             row.append('%d' %tn)
             row.append('%d' %fp)
             row.append('%d' %fn)
             row.append('%d' %tp)
-            # TODO: calc derived metrics
+            # derived metrics: precision, recall, f-score and accuracy
+            try:
+                p = tp / float(tp+fp)
+            except ZeroDivisionError:
+                p = 1.0
+            try:
+                r = tp / float(tp+fn)
+            except ZeroDivisionError:
+                r = 1.0
+            try:
+                f = 2.0 * p * r / (p+r)
+            except ZeroDivisionError:
+                f = 0.0
+            try:
+                a = (tp+tn)/float(tn+fp+fn+tp)
+            except ZeroDivisionError:
+                a = 1.0
+            row.append('%14.9f' %(100.0*p))
+            row.append('%14.9f' %(100.0*r))
+            row.append('%14.9f' %(100.0*f))
+            row.append('%14.9f' %(100.0*a))
             print('\t'.join(row))
+            row = (tn, fp, fn, tp, p, r, f, a)
+            data.append(row)
+        # update summary stats for thresholds in steps of 0.001
+        # (using integer operations to avoid numerical issues)
+        for threshold in range(1001):
+            d = summary[threshold]
+            r_length = (len(sea) * threshold + 500) // 1000
+            row = data[r_length]
+            for k in range(8):
+                d[k] += row[k]
+            for k in range(4):
+                d[8+k]  += (row[k] / float(len(sea)))
+                d[12+k] += (row[4+k] * float(len(sea)))
+            d[16] += len(sea)
+            d[17] += 1
+        summaries_updated_in_batch.add(summary_key)
+    print()
+    for summary_key in summaries_updated_in_batch:
+        print('\n\n=== Updated summary for %r ==\n' %(summary_key,))
+        summary = summaries[summary_key]
+        last_d = None
+        for threshold in range(1002):
+            if threshold > 1000:
+                d = None
+            else:
+                d = summary[threshold]
+            if d != last_d:
+                if last_d:
+                    assert threshold_min is not None
+                    row = []
+                    row.append('%5.1f' % (threshold_min/10.0)) # from
+                    row.append('%5.1f' % ((threshold-1)/10.0)) # to
+                    for k in range(4):
+                        row.append('%d' %(d[k]))  # totals of tn, fp, etc.
+                    # derived metrics: precision, recall, f-score and accuracy
+                    tn, fp, fn, tp = d[:4]
+                    try:
+                        p = tp / float(tp+fp)
+                    except ZeroDivisionError:
+                        p = 1.0
+                    try:
+                        r = tp / float(tp+fn)
+                    except ZeroDivisionError:
+                        r = 1.0
+                    try:
+                        f = 2.0 * p * r / (p+r)
+                    except ZeroDivisionError:
+                        f = 0.0
+                    try:
+                        a = (tp+tn)/float(tn+fp+fn+tp)
+                    row.append('%14.9f' %(100.0*p))
+                    row.append('%14.9f' %(100.0*r))
+                    row.append('%14.9f' %(100.0*f))
+                    row.append('%14.9f' %(100.0*a))
+                    # average P, R, F, A
+                    row.append('%14.9f' %(100.0*d[4]/float(d[17]))
+                    row.append('%14.9f' %(100.0*d[5]/float(d[17]))
+                    row.append('%14.9f' %(100.0*d[6]/float(d[17]))
+                    row.append('%14.9f' %(100.0*d[7]/float(d[17]))
+                    # inversely weighted stats
+                    tn, fp, fn, tp = d[8:12]
+                    # TODO
+
+                    print('\t'.join(row))
+                last_d = d
+                if d:
+                    threshold_min = threshold
+                else:
+                    threshold_min = None
     print()
     print('Spent %.1f seconds on printing tables.' %(time.time() - start_t))
     sys.stdout.flush()
