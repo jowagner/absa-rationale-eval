@@ -1247,8 +1247,17 @@ def get_dev_and_test_instances():
         ('dev',  dev_dataset_combined),
         ('test', te_dataset_combined),
     ]:
+        if test_type == 'dev':
+            size = len(test_set) // len(training_masks)
+            assert len(test_set) % len(training_masks) == 0
+        elif test_type == 'test':
+            size = len(test_set) // 3
+            assert len(test_set) % 3 == 0
+        else:
+            raise ValueError('unsupported test set %s' %test_type)
         for index, item in enumerate(test_set):
             item['test_type'] = test_type
+            item['set_size_per_mask']  = size
             yield item
 
 def get_batches_for_saliency(model):
@@ -1434,7 +1443,7 @@ for batch in get_batches_for_saliency(best_model):
             assert length + 1 == len(length2confusions)
         assert len(rationale) == len(sea)  # last rationale should cover all tokens
         # prepare storing cumulative stats for evaluation scores for full data sets
-        summary_key = (seed, question, batch_item['test_type'], batch_item['domain'], batch_item['mask'])
+        summary_key = (seed, question, batch_item['test_type'], batch_item['mask'])
         if summary_key not in summaries:
             summaries[summary_key] = {}
             summary = summaries[summary_key]
@@ -1497,20 +1506,29 @@ for batch in get_batches_for_saliency(best_model):
                 d[12+k] += (row[4+k] * float(len(sea)))
             d[16] += len(sea)
             d[17] += 1
+        if 'set_size_per_mask' not in summary:
+            summary['set_size_per_mask'] = batch_item['set_size_per_mask']
         summaries_updated_in_batch.add(summary_key)
     print()
     for summary_key in summaries_updated_in_batch:
-        print('\n\n=== Updated summary for %r ==\n' %(summary_key,))
+        summary = summaries[summary_key]
+        if summary[0][17] < summary['set_size_per_mask']:
+            print('\n\n=== Updated summary for %r ==\n' %(summary_key,))
+        else:
+            print('\n\n=== Final summary for %r ==\n' %(summary_key,))
+        print('For %d of %d test items' %(summary[0][17], summary['set_size_per_mask']))
         header = """From To tn fp fn tp Pr Re F Acc
         Avg-Pr Avg-Re Avg-F Avg-Acc
         IW-tn IW-fp IW-fn IW-tp IW-Pr IW-Re IW-F IW-Acc
         """.split()
+        print()
         print('\t'.join(header))
-        summary = summaries[summary_key]
         last_d = None
+        rows_without_header = 0
         for threshold in range(1002):
-            if (header % 40 == 0) and 0 < header < 1000:
+            if (threshold % 40 == 0) and 0 < threshold < 1000 and rows_without_header > 10:
                 print('#'+('\t'.join(header)))
+                rows_without_header = 0
             if threshold > 1000:
                 d = None
             else:
@@ -1552,7 +1570,7 @@ for batch in get_batches_for_saliency(best_model):
                     row.append('%14.9f' %(100.0*last_d[7]/float(last_d[17])))
                     # inversely weighted stats
                     for k in range(8,12):
-                        row.append('%.2f' %(last_d[k]))  # totals of inversly weighted tn, fp, etc.
+                        row.append('%.6f' %(last_d[k]))  # totals of inversly weighted tn, fp, etc.
                     tn, fp, fn, tp = last_d[8:12]
                     try:
                         p = tp / float(tp+fp)
@@ -1575,6 +1593,7 @@ for batch in get_batches_for_saliency(best_model):
                     row.append('%14.9f' %(100.0*f))
                     row.append('%14.9f' %(100.0*a))
                     print('\t'.join(row))
+                    rows_without_header += 1
                 last_d = d
                 if d:
                     threshold_min = threshold
