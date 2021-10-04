@@ -3,6 +3,7 @@
 #SBATCH -p compute     # which partition to run on
 #SBATCH -J a-%(shortname)s%(part)d-42h    # name for the job
 #SBATCH --mem=87000
+#SBATCH --exclusive
 #SBATCH --constraint=avx2
 #SBATCH --cpus-per-task=32
 #SBATCH --ntasks=1
