@@ -539,8 +539,13 @@ print('Training size:', len(tr_dataset_object))
 
 # create a separate dev set for each question template
 
+if skip_training and skip_evaluation:
+    dev_masks = [None]
+else:
+    dev_masks = training_masks
+
 dev_dataset_objects = []
-for training_mask in training_masks:
+for training_mask in dev_masks:
     for template_index in range(len(templates)):
         dev_dataset_objects.append(ABSA_Dataset(
             dev_dataset,
@@ -562,8 +567,13 @@ print('Devset size (using all templates):', len(dev_dataset_combined))
 
 # create a separate test set for each question template
 
+if skip_evaluation:
+    test_masks = [None]
+else:
+    test_masks = (None, 'O', 'I')
+
 te_dataset_objects = []
-for mask in (None, 'O', 'I'):
+for mask in test_masks:
     for template_index in range(len(templates)):
         te_dataset_objects.append(ABSA_Dataset(
             te_dataset,
@@ -1248,11 +1258,11 @@ def get_dev_and_test_instances():
         ('test', te_dataset_combined),
     ]:
         if test_type == 'dev':
-            size = len(test_set) // len(training_masks)
-            assert len(test_set) % len(training_masks) == 0
+            size = len(test_set) // len(dev_masks)
+            assert len(test_set) % len(dev_masks) == 0
         elif test_type == 'test':
-            size = len(test_set) // 3
-            assert len(test_set) % 3 == 0
+            size = len(test_set) // len(test_masks)
+            assert len(test_set) % len(test_masks) == 0
         else:
             raise ValueError('unsupported test set %s' %test_type)
         for index, item in enumerate(test_set):
@@ -1305,9 +1315,13 @@ if best_model.tokenizer is None:
     #print('setting tokeniser')
     best_model.tokenizer = tokeniser
 
-def get_confusion_matrix(sea, rationale):
+def get_confusion_matrix(sea, rationale, raw_tokens):
+    global function_words
     tn, fp, fn, tp = 0, 0, 0, 0
     for index, annotation in enumerate(sea):
+        if raw_tokens[index].lower() in function_words:
+            # exclude this token from the evaluation
+            continue
         if annotation == 'I' and index in rationale:
             tp += 1
         elif annotation == 'I':
@@ -1328,6 +1342,14 @@ def get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index):
     assert word_id_q is not None
     assert word_id_0 is not None
     return word_id_q - word_id_0
+
+function_words = set()
+with open(data_prefix + 'function-words.txt', 'rt') as f:
+    while True:
+        line = f.readline()
+        if not line:
+            break
+        function_words.add(line.split()[0])
 
 summaries = {}
 
@@ -1409,15 +1431,19 @@ for batch in get_batches_for_saliency(best_model):
         top_i = list(map(lambda x: x[1], scores))
         for _, i in scores:
             top_i.append(i)
+        raw_tokens = batch_item['tokens']
         for i in range(start_seqB, end_seqB):
             score = s[j][i].item()
             top = top_i.index(i)
             sea_index = get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, i)
+            raw_token = raw_tokens[sea_index]
             top = '%4d' %(1+top)
-            print('%s\t%14.9f\t%14.9f\t%r\t%s' %(
+            print('%s\t%14.9f\t%14.9f\t%r\t%s\t%s\t%s' %(
                 top, (100.0*score), (100.0*score/total_seqB),
                 sea[sea_index],
+                'f' if raw_token.lower() in function_words else '  --->',
                 tokens[i],
+                raw_token
             ))
         print('total\t%14.9f\n\noutside seq B\t%14.9f\nbefore\t%14.9f\nafter\t%14.9f\nfirst SEP\t%14.9f\nsecond SEP\t%14.9f' %(
             100.0*total_seqB, 100.0*(1.0-total_seqB),
@@ -1431,7 +1457,7 @@ for batch in get_batches_for_saliency(best_model):
         True-Positives Precision Recall F-Score Accuracy""".split()))
         rationale = set()
         length2confusions = {}
-        length2confusions[0] = get_confusion_matrix(sea, rationale)
+        length2confusions[0] = get_confusion_matrix(sea, rationale, raw_tokens)
         for score, index in scores:
             # add token to rationale
             rationale.add(get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index))
@@ -1439,7 +1465,7 @@ for batch in get_batches_for_saliency(best_model):
             if length not in length2confusions:
                 # found a new rationale
                 # --> get confusion matrix for this rationale
-                length2confusions[length] = get_confusion_matrix(sea, rationale)
+                length2confusions[length] = get_confusion_matrix(sea, rationale, raw_tokens)
             assert length + 1 == len(length2confusions)
         assert len(rationale) == len(sea)  # last rationale should cover all tokens
         # prepare storing cumulative stats for evaluation scores for full data sets
