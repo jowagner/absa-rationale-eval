@@ -46,6 +46,8 @@ elif training_task == 'All':    # concatenation of above training sets
 else:
     raise ValueError('unknown training task %s' %training_task)
 
+exclude_function_words = False
+
 # 1.1 BERT Configuration
 
 model_size          = 'base'  # choose between 'tiny', 'base' and 'large'
@@ -1319,7 +1321,8 @@ def get_confusion_matrix(sea, rationale, raw_tokens):
     global function_words
     tn, fp, fn, tp = 0, 0, 0, 0
     for index, annotation in enumerate(sea):
-        if raw_tokens[index].lower() in function_words:
+        if exclude_function_words \
+        and raw_tokens[index].lower() in function_words:
             # exclude this token from the evaluation
             continue
         if annotation == 'I' and index in rationale:
