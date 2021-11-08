@@ -15,6 +15,25 @@ import sys
 import time
 import torch
 
+def usage():
+    print('Usage: $0 [options] <SEED> <COMMAND> <MASK>')
+    # TODO: print more details how to use this script
+
+opt_saliencies_from = []
+while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
+    option = sys.argv[1].replace('_', '-')
+    del sys.argv[1]
+    if option in ('-h', '--help'):
+        usage()
+        sys.exit(0)
+    elif option == '--saliencies-from':
+        opt_saliencies_from.append(sys.argv[1])
+        del sys.argv[1]
+    else:
+        print('Unknown option', option)
+        usage()
+        sys.exit(1)
+
 seed = int(sys.argv[1])
 assert 0 < seed < 2**31
 torch.manual_seed(seed)
@@ -1355,6 +1374,39 @@ with open(data_prefix + 'function-words.txt', 'rt') as f:
             break
         function_words.add(line.split()[0])
 
+example = """
+Subword units: [CLS] laptop : what do you think of the design _ features of laptop ? [SEP] it ' s so nice to look at and the keys are easy to type with . [SEP]
+Scores: [(0.021130122244358063, 16), (0.011964544653892517, 17), (0.01930064894258976, 18), (0.04194259271025658, 19), (0.0673951506614685, 20), (0.02628898434340954, 21), (0.039754629135131836, 22), (0.027722831815481186, 23), (0.028412630781531334, 24), (0.011970452032983303, 25), (0.06206967309117317, 26), (0.027111921459436417, 27), (0.08547540009021759, 28), (0.020255954936146736, 29), (0.051898688077926636, 30), (0.01672768034040928, 31), (0.016444828361272812, 32)]
+"""
+
+subwords2scores = {}
+for saliency_file in opt_saliencies_from:
+    with open(saliency_file, 'rt') as f:
+        while True:
+            line = f.readline()
+            if not line:
+                break
+            if line.startswith('Subword units: [CLS] '):
+                #print('Reading', line)
+                subwords = line.split()[2:]
+                assert len(subwords) > 0
+                fields = f.readline().split(',')
+                assert len(fields) % 2 == 0
+                scores = []
+                start = -1
+                for index in range(len(fields)//2):
+                    _, score = fields[2*index].split('(')
+                    offset, _ = fields[2*index+1].split(')')
+                    offset = int(offset)
+                    #print('Index-Score-Offset-START:', index, score, offset, start)
+                    if index == 0:
+                        start = offset
+                    else:
+                        assert offset == start + index
+                    scores.append((float(score), offset))
+                assert len(subwords) > 3 + len(scores)
+                subwords2scores[' '.join(subwords)] = scores
+
 summaries = {}
 
 for batch in get_batches_for_saliency(best_model):
@@ -1366,12 +1418,15 @@ for batch in get_batches_for_saliency(best_model):
         prepare_target = True
     )
     print('Spent %.1f seconds on batch finalisation.' %(time.time() - start_t))
-    start_t = time.time()
-    s = interpret(
-        best_model, finalised_instance, labels,
-        variant = 'short line'
-    )
-    print('Spent %.1f seconds on obtaining saliency scores.' %(time.time() - start_t))
+    if not subwords2scores:
+        start_t = time.time()
+        s = interpret(
+            best_model, finalised_instance, labels,
+            variant = 'short line'
+        )
+        print('Spent %.1f seconds on obtaining saliency scores.' %(time.time() - start_t))
+    else:
+        s = None
     #print('shape of saliencies:', s.shape)
 
     # display salience maps (plain text)
@@ -1397,7 +1452,7 @@ for batch in get_batches_for_saliency(best_model):
         tokens = finalised_instance[j].tokens
         start_seqB = tokens.index('[SEP]') + 1
         end_seqB   = tokens.index('[PAD]') - 1
-        tokens = tokens[:end_seqB + 1]
+        tokens = tokens[:end_seqB + 1]   # remove padding
         sea = batch_item['sea']
         print('\t'.join('seed question set index domain mask gold pred tokens subwords SEA-I SEA-O SEA-percentage'.split()))
         print('\t'.join([
@@ -1416,28 +1471,38 @@ for batch in get_batches_for_saliency(best_model):
         ]))
         print()
         print('Subword units:', ' '.join(tokens))
-        scores = []
-        total_pad = 0.0
-        total_other = 0.0
-        for i in range(s.shape[1]):
-            score = s[j][i].item()
-            if i < start_seqB:
-                total_other += score
-            elif i < end_seqB:
-                scores.append((score, i))
-            else:
-                total_pad += score
+        if not subwords2scores:
+            scores = []
+            total_pad = 0.0
+            total_other = 0.0
+            for i in range(s.shape[1]):
+                score = s[j][i].item()
+                if i < start_seqB:
+                    total_other += score
+                elif i < end_seqB:
+                    scores.append((score, i))
+                else:
+                    total_pad += score
+            score_pad_1 = s[j][start_seqB-1]
+            score_pad_2 = s[j][end_seqB]
+        else:
+            scores = subwords2scores[' '.join(tokens)]
+            total_pad   = -1.0   # TODO: also read these from saliency files
+            total_other = -1.0
+            score_pad_1 = -1.0
+            score_pad_2 = -1.0
         print('Scores:', scores)
         print()
+        scores_in_seqB = list(map(lambda x: x[0], scores))
         scores.sort()
-        total_seqB = sum(map(lambda x: x[0], scores))
+        total_seqB = sum(map(lambda x: x[0], scores))  # add in order of magnitude for best numerical precision
         scores.reverse()
         top_i = list(map(lambda x: x[1], scores))
         for _, i in scores:
             top_i.append(i)
         raw_tokens = batch_item['tokens']
         for i in range(start_seqB, end_seqB):
-            score = s[j][i].item()
+            score = scores_in_seqB[i-start_seqB]
             top = top_i.index(i)
             sea_index = get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, i)
             raw_token = raw_tokens[sea_index]
@@ -1452,13 +1517,11 @@ for batch in get_batches_for_saliency(best_model):
         print('total\t%14.9f\n\noutside seq B\t%14.9f\nbefore\t%14.9f\nafter\t%14.9f\nfirst SEP\t%14.9f\nsecond SEP\t%14.9f' %(
             100.0*total_seqB, 100.0*(1.0-total_seqB),
             100.0*total_other, 100.0*total_pad,
-            100.0*s[j][start_seqB-1],
-            100.0*s[j][end_seqB],
+            100.0*score_pad_1,
+            100.0*score_pad_2,
         ))
         print()
-        # show evaluation metrics for every possible rationale length
-        print('\t'.join("""RationaleLength Percentage True-Negatives False-Positives False-Negatives
-        True-Positives Precision Recall F-Score Accuracy""".split()))
+        # get evaluation metrics for every possible rationale length
         rationale = set()
         length2confusions = {}
         length2confusions[0] = get_confusion_matrix(sea, rationale, raw_tokens)
@@ -1470,6 +1533,21 @@ for batch in get_batches_for_saliency(best_model):
                 # found a new rationale
                 # --> get confusion matrix for this rationale
                 length2confusions[length] = get_confusion_matrix(sea, rationale, raw_tokens)
+                # print example rationales in I/O tag format
+                for (iolabel, t_length) in [
+                    ('L20', int(0.20*len(raw_tokens))),
+                    ('L40', int(0.40*len(raw_tokens))),
+                    ('L50', int(0.50*len(raw_tokens))),
+                ]:
+                    if length == t_length:
+                        for t_index in range(len(raw_tokens)):
+                            row = []
+                            row.append(iolabel)
+                            row.append(raw_tokens[t_index])
+                            row.append('I' if t_index in rationale else 'O')
+                            row.append(sea[t_index])  # also print SEA for comparison
+                            print('\t'.join(row))
+                        print()
             assert length + 1 == len(length2confusions)
         assert len(rationale) == len(sea)  # last rationale should cover all tokens
         # prepare storing cumulative stats for evaluation scores for full data sets
@@ -1489,6 +1567,8 @@ for batch in get_batches_for_saliency(best_model):
         summary = summaries[summary_key]
         data = []
         # print and collect stats for every possible rationale length
+        print('\t'.join("""RationaleLength Percentage True-Negatives False-Positives False-Negatives
+        True-Positives Precision Recall F-Score Accuracy""".split()))
         for length, length2 in enumerate(sorted(list(length2confusions.keys()))):
             assert length == length2
             row = []
