@@ -47,6 +47,7 @@ else:
     raise ValueError('unknown training task %s' %training_task)
 
 exclude_function_words = False
+get_training_saliencies = True
 
 # 1.1 BERT Configuration
 
@@ -536,6 +537,7 @@ for training_mask in training_masks:
         info = 's%d' %seed
     ))
 tr_dataset_object = torch.utils.data.ConcatDataset(tr_dataset_objects)
+training_dataset_combined = tr_dataset_object  # alternative name
 
 print('Training size:', len(tr_dataset_object))
 
@@ -1255,18 +1257,17 @@ def interpret(model, instances, labels, variant = 'integrated'):
 def get_dev_and_test_instances():
     global dev_dataset_combined
     global te_dataset_combined
-    for test_type, test_set in [
-        ('dev',  dev_dataset_combined),
-        ('test', te_dataset_combined),
+    for test_type, test_set, masks in [
+        ('training',  training_dataset_combined, training_masks),
+        ('dev',       dev_dataset_combined,      dev_masks),
+        ('test',      te_dataset_combined,       test_masks),
     ]:
-        if test_type == 'dev':
-            size = len(test_set) // len(dev_masks)
-            assert len(test_set) % len(dev_masks) == 0
-        elif test_type == 'test':
-            size = len(test_set) // len(test_masks)
-            assert len(test_set) % len(test_masks) == 0
-        else:
-            raise ValueError('unsupported test set %s' %test_type)
+        if test_type == 'training' and not get_training_saliencies:
+            continue
+        if test_type != 'training' and get_training_saliencies:
+            continue
+        size = len(test_set) // len(masks)
+        assert len(test_set) % len(masks) == 0
         for index, item in enumerate(test_set):
             item['test_type'] = test_type
             item['set_size_per_mask']  = size
