@@ -1407,6 +1407,25 @@ for saliency_file in opt_saliencies_from:
                 assert len(subwords) > 3 + len(scores)
                 subwords2scores[' '.join(subwords)] = scores
 
+def print_example_rationales(rationale, raw_tokens, batch_item, sea):
+    ''' print example rationales in I/O tag format '''
+    length = len(rationale)
+    for (iolabel, t_length) in [
+        ('L20', int(0.20*len(raw_tokens)+0.5)),
+        ('L40', int(0.40*len(raw_tokens)+0.5)),
+        ('L50', int(0.50*len(raw_tokens)+0.5)),
+    ]:
+        if length == t_length:
+            for t_index in range(len(raw_tokens)):
+                row = []
+                row.append(iolabel)
+                row.append(batch_item['domain'])
+                row.append(raw_tokens[t_index])
+                row.append('I' if t_index in rationale else 'O')
+                row.append(sea[t_index])  # also print SEA for comparison
+                print('\t'.join(row))
+            print()
+
 summaries = {}
 
 for batch in get_batches_for_saliency(best_model):
@@ -1525,6 +1544,7 @@ for batch in get_batches_for_saliency(best_model):
         rationale = set()
         length2confusions = {}
         length2confusions[0] = get_confusion_matrix(sea, rationale, raw_tokens)
+        print_example_rationales(rationale, raw_tokens, batch_item, sea)
         for score, index in scores:
             # add token to rationale
             rationale.add(get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index))
@@ -1533,21 +1553,7 @@ for batch in get_batches_for_saliency(best_model):
                 # found a new rationale
                 # --> get confusion matrix for this rationale
                 length2confusions[length] = get_confusion_matrix(sea, rationale, raw_tokens)
-                # print example rationales in I/O tag format
-                for (iolabel, t_length) in [
-                    ('L20', int(0.20*len(raw_tokens))),
-                    ('L40', int(0.40*len(raw_tokens))),
-                    ('L50', int(0.50*len(raw_tokens))),
-                ]:
-                    if length == t_length:
-                        for t_index in range(len(raw_tokens)):
-                            row = []
-                            row.append(iolabel)
-                            row.append(raw_tokens[t_index])
-                            row.append('I' if t_index in rationale else 'O')
-                            row.append(sea[t_index])  # also print SEA for comparison
-                            print('\t'.join(row))
-                        print()
+                print_example_rationales(rationale, raw_tokens, batch_item, sea)
             assert length + 1 == len(length2confusions)
         assert len(rationale) == len(sea)  # last rationale should cover all tokens
         # prepare storing cumulative stats for evaluation scores for full data sets
