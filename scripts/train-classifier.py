@@ -348,6 +348,7 @@ def get_dataset(
             observed_polarities.add(polarity)
             if target:
                 observed_targets.add(target)
+            op_index += 1
         #print()
     return dataset
 
