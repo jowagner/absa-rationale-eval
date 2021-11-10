@@ -66,7 +66,7 @@ else:
     raise ValueError('unknown training task %s' %training_task)
 
 exclude_function_words = False
-get_training_saliencies = True
+get_training_saliencies = True   # also print saliencies for training data in addition to dev/test
 
 # 1.1 BERT Configuration
 
@@ -318,7 +318,9 @@ def get_dataset(
         #print('sent_id', sent_id)
         # get content inside the first <text>...</text> sub-element
         text = sentence.findtext('text').strip()
+        op_index = 0
         for opinion in sentence.iter('Opinion'):
+            op_id = '%s:%d' %(sent_id, op_index)
             tokens, sea = get_alignment(text, annotation.__next__())
             opin_cat = opinion.get('category')
             #print('opin_cat', opin_cat)
@@ -335,7 +337,7 @@ def get_dataset(
             # add to dataset
             dataset.append((
                 domain,
-                sent_id, text, tokens, sea,
+                op_id, text, tokens, sea,
                 entity_type, attribute_label,
                 target, span,
                 polarity
@@ -485,7 +487,7 @@ class ABSA_Dataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
             assert isinstance(idx, int)
-        domain, sent_id, text, \
+        domain, opinion_id, text, \
             tokens, sea, \
             entity_type, attribute_label, \
             target, span, \
@@ -507,6 +509,7 @@ class ABSA_Dataset(Dataset):
         retval['mask']  = self.mask
         retval['info']  = self.info
         retval['index'] = idx
+        retval['opinion_id'] = opinion_id
         retval['tokens'] = tokens
         retval['sea']   = sea
         return retval
@@ -1283,8 +1286,6 @@ def get_dev_and_test_instances():
     ]:
         if test_type == 'training' and not get_training_saliencies:
             continue
-        if test_type != 'training' and get_training_saliencies:
-            continue
         size = len(test_set) // len(masks)
         assert len(test_set) % len(masks) == 0
         for index, item in enumerate(test_set):
@@ -1420,6 +1421,8 @@ def print_example_rationales(rationale, raw_tokens, batch_item, sea):
                 row = []
                 row.append(iolabel)
                 row.append(batch_item['domain'])
+                row.append(batch_item['test_type'])
+                row.append(batch_item['opinion_id'])
                 row.append(raw_tokens[t_index])
                 row.append('I' if t_index in rationale else 'O')
                 row.append(sea[t_index])  # also print SEA for comparison
