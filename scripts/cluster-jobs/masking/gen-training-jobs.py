@@ -68,7 +68,7 @@ for RUN in 1 2 3 ; do
     touch       local-aio/prep.start
     for D in laptop restaurant ; do
         for T in train test ; do
-            cp ${T}-${D}-${L}.aio local-aio/${T}.${D}.aio
+            cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio local-aio/${T}.${D}.aio
         done
     done
 """)
