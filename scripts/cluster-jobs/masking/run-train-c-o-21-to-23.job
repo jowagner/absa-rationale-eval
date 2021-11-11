@@ -1,8 +1,8 @@
 #!/bin/bash
-  
+
 #SBATCH -p compute       # which partition to run on
 #SBATCH --gres=gpu:rtx2080ti:1
-#SBATCH -J absa-2h    # name for the job
+#SBATCH -J ab-o2-2h    # name for the job
 #SBATCH --mem=47000
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
@@ -11,6 +11,8 @@
 TR_TASK=Other
 TR_TASK_SHORT=o
 SET=2
+L=L50
+DESC=training-with-local-aio
 
 PRJ_DIR=${HOME}/sentiment/absa-rationale-eval
 cd $PRJ_DIR
@@ -23,14 +25,24 @@ for RUN in 1 2 3 ; do
     MODEL_DIR=c-${TR_TASK_SHORT}-${SET}-${RUN}
     mkdir $MODEL_DIR
     cd $MODEL_DIR
+    mv best-model-weights-only.ckpt $(mktemp -u best-model-weights-only-XXXXXXXXXXXX.ckpt)
     ln -s ../data
-    hostname >> training.start
-    date >> training.start
-    echo $MODEL_DIR >> training.start
-    echo $TR_TASK >> training.start
-    touch training.start
-    ../scripts/train-classifier.py ${SET}${RUN} train $TR_TASK 2> stderr.txt > stdout.txt
-    touch training.end
+    mkdir local-aio
+    hostname >> local-aio/prep.start
+    date     >> local-aio/prep.start
+    touch       local-aio/prep.start
+    for D in laptop restaurant ; do
+        for T in train test ; do
+            cp ${T}-${D}-${L}.aio local-aio/${T}.${D}.aio
+        done
+    done
+    hostname        >> ${DESC}.start
+    date            >> ${DESC}.start
+    echo $MODEL_DIR >> ${DESC}.start
+    echo $TR_TASK   >> ${DESC}.start
+    touch              ${DESC}.start
+    ../scripts/train-classifier.py --local-aio ${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    touch ${DESC}.end
     date
     echo "done"
 done
