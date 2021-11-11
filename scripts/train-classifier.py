@@ -20,12 +20,18 @@ def usage():
     # TODO: print more details how to use this script
 
 opt_saliencies_from = []
+aio_prefix = None
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
     if option in ('-h', '--help'):
         usage()
         sys.exit(0)
+    elif option == '--local-aio':
+        aio_prefix = 'local-aio/'
+    elif option == '--aio-prefix':
+        aio_prefix = sys.argv[1]
+        del sys.argv[1]
     elif option == '--saliencies-from':
         opt_saliencies_from.append(sys.argv[1])
         del sys.argv[1]
@@ -44,12 +50,15 @@ command = sys.argv[2]
 if command == 'train':
     skip_training = False
     skip_evaluation = False
+    skip_saliency = True
 elif command == 'eval':
     skip_training = True
     skip_evaluation = False
+    skip_saliency = True
 elif command == 'saliency':
     skip_training = True
     skip_evaluation = True
+    skip_saliency = False
 else:
     raise ValueError('unknown command %s' %command)
 
@@ -124,21 +133,23 @@ domains = ['laptop', 'restaurant']
 train_dev_split = (95, 5)
 
 data_prefix = 'data/'
+if aio_prefix is None:
+    aio_prefix = data_prefix
 
 filenames = {
-    'laptop':     (('ABSA16_Laptops_Train_SB1_v2.xml',
-                    'train.laptop.aio'
+    'laptop':     ((data_prefix + 'ABSA16_Laptops_Train_SB1_v2.xml',
+                    aio_prefix  + 'train.laptop.aio'
                    ),
-                   ('EN_LAPT_SB1_TEST_.xml.gold',
-                    'test.laptop.aio'
+                   (data_prefix + 'EN_LAPT_SB1_TEST_.xml.gold',
+                    aio_prefix  + 'test.laptop.aio'
                    )
                   ),
 
-    'restaurant': (('ABSA16_Restaurants_Train_SB1_v2.xml',
-                    'train.restaurant.aio'
+    'restaurant': ((data_prefix + 'ABSA16_Restaurants_Train_SB1_v2.xml',
+                    aio_prefix  + 'train.restaurant.aio'
                    ),
-                   ('EN_REST_SB1_TEST.xml.gold',
-                    'test.restaurant.aio'
+                   (data_prefix + 'EN_REST_SB1_TEST.xml.gold',
+                    aio_prefix  + 'test.restaurant.aio'
                    )
                   ),
 }
@@ -146,7 +157,6 @@ filenames = {
 for domain in domains:
     for part in (0,1):
         for filename in filenames[domain][part]:
-            filename = data_prefix + filename
             print('Using', filename)
 
 
@@ -361,8 +371,8 @@ tr_observed_targets = set()
 
 tr_dataset = []
 for domain in domains:
-    xml_filename = data_prefix + filenames[domain][0][0]
-    aio_filename = data_prefix + filenames[domain][0][1]
+    xml_filename = filenames[domain][0][0]
+    aio_filename = filenames[domain][0][1]
     tr_dataset += get_dataset(
         xml_filename, aio_filename, domain,
         tr_observed_entity_types, tr_observed_attribute_labels,
@@ -384,8 +394,8 @@ te_observed_targets = set()
 
 te_dataset = []
 for domain in domains:
-    xml_filename = data_prefix + filenames[domain][1][0]
-    aio_filename = data_prefix + filenames[domain][1][1]
+    xml_filename = filenames[domain][1][0]
+    aio_filename = filenames[domain][1][1]
     te_dataset += get_dataset(
         xml_filename, aio_filename, domain,
         te_observed_entity_types, te_observed_attribute_labels,
@@ -1168,6 +1178,9 @@ for te_index, te_dataset_object in enumerate(te_dataset_objects):
 if not skip_evaluation:
     print('\nSummary:')
     print('\n'.join(summary))
+
+if skip_saliency:
+    sys.exit(0)
 
 # Saliency maps for dev and test data
 
