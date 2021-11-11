@@ -18,6 +18,15 @@ for L in L20 L40 L50 ; do
                 | grep -v -E "^--$" \
                 | cut -f4,5,6 \
                 | scripts/sort-aio-by-id.py \
-                | tee $I/train-${D}-${L}.tmp \
                 | cut -f2,3 > $I/train-${D}-${L}.aio
+            grep -E "^"${L}"\s"${D}"\stest\s" -A 1 $I/saliency-allwio-stdout.txt \
+                | grep -v -E "^--$" \
+                | cut -f4,5,6 \
+                | scripts/sort-aio-by-id.py \
+                | cut -f2,3 > $I/test-${D}-${L}.aio
 done ; done ; done
+
+#               | tee $I/train-${D}-${L}-step1.tmp \
+#               | tee $I/train-${D}-${L}-step2.tmp \
+#               | tee $I/test-${D}-${L}-step1.tmp \
+#               | tee $I/test-${D}-${L}-step2.tmp \
