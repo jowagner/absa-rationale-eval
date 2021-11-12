@@ -37,6 +37,11 @@ while True:
         break
     elif line.startswith('==>'):
         run += 1
+    elif line.startswith('SeqB'):
+        fields = line.split('\t')
+        assert fields[3] == 'Laptop'
+        assert fields[4] == 'Restaurant'
+        assert fields[5].rstrip() == 'Description'
     elif 'Sun et al. QA-M' in line:
         if line.startswith('Full'):
             te = 'Full'
