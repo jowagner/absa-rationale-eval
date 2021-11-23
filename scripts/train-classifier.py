@@ -74,8 +74,8 @@ elif training_task == 'All':    # concatenation of above training sets
 else:
     raise ValueError('unknown training task %s' %training_task)
 
-exclude_function_words = False
-get_training_saliencies = True   # also print saliencies for training data in addition to dev/test
+exclude_function_words = True
+get_training_saliencies = False   # also print saliencies for training data in addition to dev/test
 
 # 1.1 BERT Configuration
 
@@ -1443,6 +1443,22 @@ def print_example_rationales(rationale, raw_tokens, batch_item, sea):
                 print('\t'.join(row))
             print()
 
+def get_fscore(confusion):
+    tn, fp, fn, tp = confusion
+    try:
+        p = tp / float(tp+fp)
+    except ZeroDivisionError:
+        p = 1.0
+    try:
+        r = tp / float(tp+fn)
+    except ZeroDivisionError:
+        r = 1.0
+    try:
+        f = 2.0 * p * r / (p+r)
+    except ZeroDivisionError:
+        f = 0.0
+    return f
+
 summaries = {}
 
 for batch in get_batches_for_saliency(best_model):
@@ -1562,6 +1578,9 @@ for batch in get_batches_for_saliency(best_model):
         length2confusions = {}
         length2confusions[0] = get_confusion_matrix(sea, rationale, raw_tokens)
         print_example_rationales(rationale, raw_tokens, batch_item, sea)
+        best_lengths = []
+        best_lengths.append(0)
+        best_fscore = get_fscore(length2confusions[0])
         for score, index in scores:
             # add token to rationale
             rationale.add(get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index))
@@ -1570,15 +1589,34 @@ for batch in get_batches_for_saliency(best_model):
                 # found a new rationale
                 # --> get confusion matrix for this rationale
                 length2confusions[length] = get_confusion_matrix(sea, rationale, raw_tokens)
+                # print example tables for selected lengths
                 print_example_rationales(rationale, raw_tokens, batch_item, sea)
+                # track lengths with best f-score
+                f_score = get_fscore(length2confusions[length])
+                if f_score > best_fscore:
+                    best_lengths = []
+                    best_lengths.append(length)
+                    best_fscore = f_score
+                elif f_score == best_fscore:
+                    best_lengths.append(length)
             assert length + 1 == len(length2confusions)
         assert len(rationale) == len(sea)  # last rationale should cover all tokens
+        # length oracle
+        best_length = best_lengths[0]
+        print('Best f-score %.9f with lengths %r, shortest optimal length %d\n' %(
+            best_fscore, best_lengths, best_length
+        ))
         # prepare storing cumulative stats for evaluation scores for full data sets
-        summary_key = (seed, question, batch_item['test_type'], batch_item['mask'])
-        if summary_key not in summaries:
+        thresholds_and_summary_keys = [
+            (1001, (seed, question, batch_item['test_type'], batch_item['mask'])),
+            (1,    ('length oracle', seed, question, batch_item['test_type'], batch_item['mask'])),
+        ]
+        for n_thresholds, summary_key in thresholds_and_summary_keys:
+            if summary_key in summaries:
+                continue
             summaries[summary_key] = {}
             summary = summaries[summary_key]
-            for threshold in range(1001):
+            for threshold in range(n_thresholds):
                 d = []
                 for _ in range(4):
                     d.append(0)
@@ -1587,7 +1625,10 @@ for batch in get_batches_for_saliency(best_model):
                 d.append(0)
                 d.append(0)
                 summary[threshold] = d
+        summary_key = thresholds_and_summary_keys[0][1]
         summary = summaries[summary_key]
+        length_oracle_summary_key = thresholds_and_summary_keys[1][1]
+        length_oracle_summary = summaries[length_oracle_summary_key]
         data = []
         # print and collect stats for every possible rationale length
         print('\t'.join("""RationaleLength Percentage True-Negatives False-Positives False-Negatives
@@ -1626,6 +1667,18 @@ for batch in get_batches_for_saliency(best_model):
             print('\t'.join(row))
             row = (tn, fp, fn, tp, p, r, f, a)
             data.append(row)
+            if length == best_length:
+                d = length_oracle_summary[0]
+                for k in range(8):
+                    d[k] += row[k]
+                for k in range(4):
+                    d[8+k]  += (row[k] / float(len(sea)))
+                    d[12+k] += (row[4+k] * float(len(sea)))
+                d[16] += len(sea)
+                d[17] += 1
+                if 'set_size_per_mask' not in length_oracle_summary:
+                    length_oracle_summary['set_size_per_mask'] = batch_item['set_size_per_mask']
+                summaries_updated_in_batch.add(length_oracle_summary_key)
         # update summary stats for thresholds in steps of 0.001
         # (using integer operations to avoid numerical issues)
         for threshold in range(1001):
@@ -1658,11 +1711,15 @@ for batch in get_batches_for_saliency(best_model):
         print('\t'.join(header))
         last_d = None
         rows_without_header = 0
-        for threshold in range(1002):
+        if len(summary.keys()) > 500:
+            n_thresholds = 1001
+        else:
+            n_thresholds = 1
+        for threshold in range(1+n_thresholds):
             if (threshold % 40 == 0) and 0 < threshold < 1000 and rows_without_header > 10:
                 print('#'+('\t'.join(header)))
                 rows_without_header = 0
-            if threshold > 1000:
+            if threshold == n_thresholds:
                 d = None
             else:
                 d = summary[threshold]
