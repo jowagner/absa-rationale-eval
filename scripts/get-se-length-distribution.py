@@ -104,8 +104,10 @@ def get_per_item_stats(aio_filename):
 # get data stats
 
 rlen_counts = 11 * [0]
+domain2rlen_counts = {}
 
 for domain in domains:
+    drlen_counts = 11 * [0]
     aio_filename = filenames[domain][dataset_index]
     stats = get_per_item_stats(aio_filename)
     for item in stats:
@@ -119,7 +121,9 @@ for domain in domains:
         ))
         rlen_bin = 10 * se_length // n_tokens
         rlen_counts[rlen_bin] += 1
+        drlen_counts[rlen_bin] += 1
+    domain2rlen_counts[domain] = drlen_counts
 
 print(rlen_counts)
-        
-
+for domain in domains:
+    print(domain, domain2rlen_counts[domain])
