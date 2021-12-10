@@ -20,6 +20,9 @@ def usage():
     # TODO: print more details how to use this script
 
 opt_saliencies_from = []
+opt_save_model_as   = 'best-model-weights-only.ckpt'
+opt_load_model_from = 'best-model-weights-only.ckpt'
+lmf_specified = False
 aio_prefix = None
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
@@ -31,6 +34,15 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         aio_prefix = 'local-aio/'
     elif option == '--aio-prefix':
         aio_prefix = sys.argv[1]
+        del sys.argv[1]
+    elif option in ('--save-as', '--save-model', '--save-model-as'):
+        opt_save_model_as = sys.argv[1]
+        if not lmf_specified:
+            opt_load_model_from = sys.argv[1]   # also evaluate this model unless --load-from specified
+        del sys.argv[1]
+    elif option in ('--load-from', '--load-model', '--load-model-from'):
+        opt_load_model_from = sys.argv[1]
+        lmf_specified = True
         del sys.argv[1]
     elif option == '--saliencies-from':
         opt_saliencies_from.append(sys.argv[1])
@@ -1080,7 +1092,7 @@ if not skip_training:
     new_trainer.model = best_model  # @model.setter in plugins/training_type/training_type_plugin.py
 
     new_trainer.save_checkpoint(
-        "best-model-weights-only.ckpt",
+        opt_save_model_as,
         True,  # save_weights_only
         # (if saved with setting the 2nd arg to True, the checkpoint   # TODO: "False"?
         # will contain absoulte paths and training parameters)
@@ -1088,13 +1100,13 @@ if not skip_training:
 
     # to just save the bert model in pytorch format and without the classification head, we follow
     # https://github.com/PyTorchLightning/pytorch-lightning/issues/3096#issuecomment-686877242
-    best_model.bert.save_pretrained('best-bert-encoder.pt')
+    #best_model.bert.save_pretrained('best-bert-encoder.pt')
 
     # TODO: the above only saves the BERT encoder, not the classification head
 
     # Since the lightning module inherits from pytorch, we can save the full network in
     # pytorch format:
-    torch.save(best_model.state_dict(), 'best-model.pt')
+    #torch.save(best_model.state_dict(), 'best-model.pt')
 
     print('Ready')
 
@@ -1102,7 +1114,7 @@ if not skip_training:
 # 5.2 Load and Test Model
 
 best_model = Classifier.load_from_checkpoint(
-    checkpoint_path = 'best-model-weights-only.ckpt'
+    checkpoint_path = opt_load_model_from
 )
 
 best_model.eval()  # enter prediction mode, e.g. turn off dropout

@@ -10,7 +10,6 @@
 
 import sys
 
-
 local_aio = True
 
 for tr_task_short, tr_task_long in [
@@ -19,8 +18,16 @@ for tr_task_short, tr_task_long in [
     ('o', 'Other'),
     ('a', 'All'),
 ]:
+  for aio_name, local_aio, save_as in [
+     #('sea', False, 'best-sea.ckpt'),
+     #('L25', True,  'best-L25.ckpt'),
+     ('L50', True,  'best-L50.ckpt'),
+     #('L75', True,  'best-L75.ckpt'),
+  ]:
     for set_rank in (1,2,3):
-        with open('run-train-c-%s-%d1-to-%d3.job' %(tr_task_short, set_rank, set_rank), 'w') as f:
+        with open('run-train-c-%s-%s-%d1-to-%d3.job' %(
+            aio_name, tr_task_short, set_rank, set_rank
+        ), 'w') as f:
             f.write("""#!/bin/bash
 
 #SBATCH -p compute       # which partition to run on
@@ -30,20 +37,16 @@ for tr_task_short, tr_task_long in [
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
 #SBATCH -N 1-1
+#SBATCH --exclude=g103
 
 TR_TASK=%(tr_task_long)s
 TR_TASK_SHORT=%(tr_task_short)s
 SET=%(set_rank)d
-L=L50
+L=%(aio_name)s
 """ %locals())
-            if local_aio:
-                f.write("""
-DESC=training-with-local-aio
-""")
-            else:
-                f.write("""
-DESC=training
-""")
+            f.write("""
+DESC=training-with-%(aio_name)s-aio
+""" %locals())
 
             f.write("""
 PRJ_DIR=${HOME}/sentiment/absa-rationale-eval
@@ -62,16 +65,17 @@ for RUN in 1 2 3 ; do
 """)
             if local_aio:
                 f.write("""
-    mkdir local-aio
-    hostname >> local-aio/prep.start
-    date     >> local-aio/prep.start
-    touch       local-aio/prep.start
+    LAIODIR=local-aio-%(aio_name)s
+    mkdir $LAIODIR
+    hostname >> $LAIODIR/prep.start
+    date     >> $LAIODIR/prep.start
+    touch       $LAIODIR/prep.start
     for D in laptop restaurant ; do
         for T in train test ; do
-            cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio local-aio/${T}.${D}.aio
+            cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio $LAIODIR/${T}.${D}.aio
         done
     done
-""")
+""" %locals())
 
             f.write("""
     hostname        >> ${DESC}.start
@@ -83,12 +87,12 @@ for RUN in 1 2 3 ; do
 
             if local_aio:
                 f.write("""
-    ../scripts/train-classifier.py --local-aio 2${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
-""")
+    ../scripts/train-classifier.py --aio-prefix $LAIODIR/ --save-model-as %(save_as)s ${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+""" %locals())
             else:
                 f.write("""
-    ../scripts/train-classifier.py ${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
-""")
+    ../scripts/train-classifier.py --save-model-as %(save_as)s ${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+""" %locals())
 
             f.write("""
     touch ${DESC}.end

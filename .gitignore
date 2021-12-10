@@ -132,6 +132,7 @@ dmypy.json
 fig*.t??
 *.bz2
 *.tgz
+*.gpg
 
 # work dirs
 c-?-?-?
