@@ -74,8 +74,8 @@ elif training_task == 'All':    # concatenation of above training sets
 else:
     raise ValueError('unknown training task %s' %training_task)
 
-exclude_function_words = True
-get_training_saliencies = False   # also print saliencies for training data in addition to dev/test
+exclude_function_words = True    # only affects evaluation measures and confusion matrices
+get_training_saliencies = True   # also print saliencies for training data in addition to dev/test
 
 # 1.1 BERT Configuration
 
@@ -1125,7 +1125,7 @@ def test_and_print(te_dataset_object):
     if best_model.tokenizer is None:
         #print('setting tokeniser')
         best_model.tokenizer = tokeniser
-    result = new_trainer.test(best_model, test_dataloaders = [test_dataloader])
+    result = new_trainer.test(best_model, test_dataloaders = [test_dataloader])    # TODO: `trainer.test(test_dataloaders)` is deprecated in v1.4 and will be removed in v1.6. Use `trainer.test(dataloaders)` instead.
     assert len(result) == 1
     return result[0]['test_acc']
 
@@ -1427,8 +1427,12 @@ def print_example_rationales(rationale, raw_tokens, batch_item, sea):
     length = len(rationale)
     for (iolabel, t_length) in [
         ('L20', int(0.20*len(raw_tokens)+0.5)),
+        ('L25', int(0.25*len(raw_tokens)+0.5)),
+        ('L33', int(0.33*len(raw_tokens)+0.5)),
         ('L40', int(0.40*len(raw_tokens)+0.5)),
         ('L50', int(0.50*len(raw_tokens)+0.5)),
+        ('L67', int(0.67*len(raw_tokens)+0.5)),
+        ('L75', int(0.75*len(raw_tokens)+0.5)),
     ]:
         if length == t_length:
             for t_index in range(len(raw_tokens)):

@@ -26,12 +26,13 @@ for RUN in 1 2 3 ; do
     #mkdir $MODEL_DIR
     cd $MODEL_DIR
     ln -s ../data
-    hostname >> saliency.start
-    date >> saliency.start
-    echo $MODEL_DIR >> saliency.start
-    touch saliency.start
-    ../scripts/train-classifier.py ${SET}${RUN} saliency ${TR_TASK} 2> saliency-stderr.txt > saliency-stdout.txt
-    touch saliency.end
+    hostname >> saliency-%(outsuffix)s.start
+    date     >> saliency-%(outsuffix)s.start
+    echo $MODEL_DIR >> saliency-%(outsuffix)s.start
+    touch saliency-%(outsuffix)s.start
+    ../scripts/train-classifier.py %(options)s ${SET}${RUN} saliency ${TR_TASK} 2> saliency-%(outsuffix)s-stderr.txt > saliency-%(outsuffix)s-stdout.txt
+    date >> saliency-%(outsuffix)s.end
+    touch   saliency-%(outsuffix)s.end
     date
     echo "done"
 done

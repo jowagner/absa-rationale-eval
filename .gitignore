@@ -127,3 +127,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# intermediate result files
+fig*.t??
+*.bz2
+*.tgz
+
+# work dirs
+c-?-?-?
+
+# software
+nvidia
+venv-pytorch

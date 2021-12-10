@@ -2,6 +2,9 @@
 
 template = open('template-saliency.job', 'r').read()
 
+outsuffix = 'morewio-xfw'
+options = '--saliencies-from saliency-tr-stdout.txt --saliencies-from saliency-stdout-wfw.txt'
+
 for shortname, longname in [
     ('f', 'Full'),
     ('s', 'SE'),
