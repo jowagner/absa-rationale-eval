@@ -21,10 +21,10 @@ def new_confusion_matrix():
 tables = {}
 
 for tr_type_short, tr_type_long in [
-        ('f', 'Tr=Full'),
-        ('s', 'Tr=SE'),
-        ('o', 'Tr=Other'),
-        ('a', 'Tr=Concat'),
+        ('f', 'Tr=1-Full'),
+        ('s', 'Tr=2-SE'),
+        ('o', 'Tr=3-Other'),
+        ('a', 'Tr=4-Concat'),
 ]:
     set_index = 0
     for set_major, set_minor in [
@@ -67,7 +67,7 @@ for tr_type_short, tr_type_long in [
             elif mask == 'O':
                 te_type = 'Te=SE (Mask=O)'
             elif mask == 'I':
-                te_type = 'Te=Other (Mask=I)'
+                te_type = 'Te=Z-Other (Mask=I)'
             else:
                 raise ValueError('Mask %r in %r' %(mask, line))
             for cm_key in [
