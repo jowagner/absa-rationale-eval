@@ -55,7 +55,9 @@ for tr_type_short, tr_type_long in [
             pred   = fields[header.index('pred')]
             sea_i_tags = int(fields[header.index('SEA-I')])
             sea_o_tags = int(fields[header.index('SEA-O')])
-            assert sea_i_tags + sea_o_tags > 0
+            assert sea_i_tags >= 0  # tag counts must not be negative
+            assert sea_o_tags >= 0
+            assert sea_i_tags + sea_o_tags > 0  # must have at least 1 token
             if sea_i_tags == 0:
                 sea = 'no-I'
             elif sea_o_tags == 0:
