@@ -1,14 +1,3 @@
-run-train-c-a-11-to-13.job
-run-train-c-a-21-to-23.job
-run-train-c-a-31-to-33.job
-run-train-c-f-11-to-13.job
-run-train-c-f-21-to-23.job
-run-train-c-f-31-to-33.job
-run-train-c-o-11-to-13.job
-run-train-c-o-21-to-23.job
-run-train-c-o-31-to-33.job
-run-train-c-s-11-to-13.job
-run-train-c-s-21-to-23.job
-run-train-c-s-31-to-33.job
+run-train-c-*.job
 slurm-*.out
 *.gpg
