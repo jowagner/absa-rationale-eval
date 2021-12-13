@@ -13,7 +13,7 @@ import sys
 tr = sys.argv[1]
 m_type = sys.argv[2]
 
-assert m_type in ('SE', 'R')
+assert m_type == 'SE' or m_type.startswith('R')
 
 example = """
 ==> c-f-1-1/stdout-training-with-local-aio.txt <==
@@ -48,7 +48,7 @@ while True:
         elif line.startswith('SE'):
             te = m_type
         elif line.startswith('Other'):
-            te = 'Z-CompR' if m_type == 'R' else 'Z-Other'
+            te = 'Z-Comp'+m_type if m_type.startswith('R') else 'Z-Other'
         else:
             raise ValueError(line)
         for index, domain in enumerate('Laptop Restaurant'.split()):
