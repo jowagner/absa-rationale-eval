@@ -59,9 +59,9 @@ for tr_type_short, tr_type_long in [
             assert sea_o_tags >= 0
             assert sea_i_tags + sea_o_tags > 0  # must have at least 1 token
             if sea_i_tags == 0:
-                sea = 'no-I'
+                sea = 'no-I (empty SE)'
             elif sea_o_tags == 0:
-                sea = 'no-O'       # above assertion excludes no-O-and-no-I case
+                sea = 'no-O (SE=all)'  # above assertion excludes no-O-and-no-I case
             else:
                 sea = 'both-I-and-O'
             if mask == 'None':
