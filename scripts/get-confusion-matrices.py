@@ -59,7 +59,7 @@ for tr_type_short, tr_type_long in [
             if sea_i_tags == 0:
                 sea = 'no-I'
             elif sea_o_tags == 0:
-                sea = 'no-O'
+                sea = 'no-O'       # above assertion excludes no-O-and-no-I case
             else:
                 sea = 'both-I-and-O'
             if mask == 'None':
