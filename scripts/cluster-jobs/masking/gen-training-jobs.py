@@ -21,8 +21,9 @@ for tr_task_short, tr_task_long in [
   for aio_name, local_aio, save_as in [
      #('sea', False, 'best-sea.ckpt'),
      #('L25', True,  'best-L25.ckpt'),
-     ('L50', True,  'best-L50.ckpt'),
+     #('L50', True,  'best-L50.ckpt'),
      #('L75', True,  'best-L75.ckpt'),
+     ('union', True, 'best-union.ckpt'),
   ]:
     for set_rank in (1,2,3):
         with open('run-train-c-%s-%s-%d1-to-%d3.job' %(
@@ -72,7 +73,18 @@ for RUN in 1 2 3 ; do
     touch       $LAIODIR/prep.start
     for D in laptop restaurant ; do
         for T in train test ; do
+""" %locals())
+                if aio_name.startswith('L'):
+                    f.write("""
             cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio $LAIODIR/${T}.${D}.aio
+""" %locals())
+                elif aio_name == 'union':
+                    f.write("""
+            ../scripts/union-aio.py < data/${T}.${D}.aio > $LAIODIR/${T}.${D}.aio
+""" %locals())
+                else:
+                    raise ValueError('unknown aio_name %s' %aio_name)
+                f.write("""
         done
     done
 """ %locals())
@@ -95,6 +107,7 @@ for RUN in 1 2 3 ; do
 """ %locals())
 
             f.write("""
+    date >> ${DESC}.end
     touch ${DESC}.end
     date
     echo "done"
