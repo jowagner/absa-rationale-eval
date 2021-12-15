@@ -13,13 +13,23 @@ import sys
 
 debug = False
 
+def bstring(s):
+    if type(b'') is str:
+        return s
+    if type(s) is bytes:
+        return s
+    return s.encode('utf-8')
+
 if sys.argv[1] == '--seed':
     seed = sys.argv[2]
     del sys.argv[2]
     del sys.argv[1]
     if seed != '0':   # 0 = use system default
         import hashlib
-        seed = int(hashlib.sha512(seed).hexdigest(), 16)  # convert string to int conistently across python versions
+        if type(b'') is not str:
+            # Python 3
+            seed = seed.encode('UTF-8')
+        seed = int(hashlib.sha512(seed).hexdigest(), 16)  # convert string to int consistently across Python versions
         if debug: sys.stdout.write('Seed hashed to %d\n' %seed)
         random.seed(seed)
 
