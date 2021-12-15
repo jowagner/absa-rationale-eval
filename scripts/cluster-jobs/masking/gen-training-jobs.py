@@ -12,17 +12,17 @@ import sys
 
 local_aio = True
 
-for tr_task_short, tr_task_long in [
-    ('f', 'Full'),
-    ('s', 'SE'),
-    ('o', 'Other'),
-    ('a', 'All'),
+for tr_task_short, tr_task_long, hours in [
+    ('f', 'Full',  2),
+    ('s', 'SE',    2),
+    ('o', 'Other', 2),
+    ('a', 'All',   6),
 ]:
   for aio_name, local_aio, save_as in [
-     #('sea', False, 'best-sea.ckpt'),
-     #('L25', True,  'best-L25.ckpt'),
-     #('L50', True,  'best-L50.ckpt'),
-     #('L75', True,  'best-L75.ckpt'),
+     ('sea', False, 'best-sea.ckpt'),
+     ('L25', True,  'best-L25.ckpt'),
+     ('L50', True,  'best-L50.ckpt'),
+     ('L75', True,  'best-L75.ckpt'),
      ('union', True, 'best-union.ckpt'),
   ]:
     for set_rank in (1,2,3):
@@ -33,7 +33,7 @@ for tr_task_short, tr_task_long in [
 
 #SBATCH -p compute       # which partition to run on
 #SBATCH --gres=gpu:rtx2080ti:1
-#SBATCH -J ab-%(tr_task_short)s%(set_rank)d-2h    # name for the job
+#SBATCH -J ab-%(tr_task_short)s%(set_rank)d-%(hours)dh    # name for the job
 #SBATCH --mem=47000
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
