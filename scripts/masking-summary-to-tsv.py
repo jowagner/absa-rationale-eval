@@ -32,6 +32,7 @@ trshort2sortkey = {
     'a': 'tr=Z_Concat',
 }
 
+data = {}
 run = 0
 while True:
     line = sys.stdin.readline()
@@ -87,3 +88,75 @@ while True:
             row.append(score)
             sys.stdout.write('\t'.join(row))
             sys.stdout.write('\n')
+            key = (m_type, tr, domain, te, run)
+            data[key] = float(score)
+
+# create latex tables
+
+f = open('results-masking-diagonal.tex', 'wt')
+f.write(r"""% Table with masking results, diagonale of results from Appendix
+
+\begin{table}
+    %\small
+    \centering
+    \begin{tabular}{l|rrr}
+    %\hline
+    \textbf{Mask} & \multicolumn{3}{c}{\textbf{Training and Test Setting}} \\
+                   & \textbf{Full} & \textbf{SE/R} & \textbf{$\neg$SE/$\neg$R} \\
+    \hline
+""")
+
+for domain in ('Laptop', 'Restaurant'):
+    f.write(r"""    \multicolumn{4}{l}{Test set: %(domain)s} \\
+    \hline
+""" %locals())
+    for m_type, mask_title in [
+        ('tab2-SE',   'SE'),
+        ('tab2-U-SE', 'U-SE'),
+        (None, None),            # = hline separator
+        ('tab3-L25',  '@.25'),
+        ('tab3-L50',  '@.5'),
+        ('tab3-L75',  '@.75'),
+        (None, None),            # = hline separator
+    ]:
+        if not m_type:
+            f.write(r'    \hline')
+            f.write('\n')
+            continue
+        gap = (5 - len(mask_title)) * ' '
+        f.write(r'    \textbf{%s}%s' %(mask_title, gap))
+        for tr, te in [
+            ('tr=Full',    'Full'),
+            ('tr=SE/R',    'SE/R'),
+            ('tr=Y_Other', 'Z-CompSE/R'),
+        ]:
+            scores = []
+            for run in range(1,10):
+                key = (m_type, tr, domain, te, run)
+                scores.append(data[key])
+            avg_score = sum(scores)/float(len(scores))
+            sq_errors = []
+            for score in scores:
+                error = avg_score - score
+                sq_errors.append(error**2)
+            n = len(scores)
+            #std_dev = (sum(sq_errors)/float(n))**0.5                   # Population std dev
+            #std_dev = (sum(sq_errors)/(n-1.0))**0.5                    # Simple sample std dev
+            #std_dev = (sum(sq_errors)/(n-1.5))**0.5                    # Approximate std dev
+            std_dev = (sum(sq_errors)/(n-1.5+1.0/(8.0*(n-1.0))))**0.5  # More accurate std dev
+            f.write(r'& %.1f $\pm %.1f$ ' %(avg_score, std_dev))
+        f.write(r'\\')
+        f.write('\n')
+f.write(r"""    \end{tabular}
+    \caption{Test set accuracy (x100, average and standard deviation over nine runs)
+             and effect of masking sentiment expressions (SE),
+             union of all SEs where a sentence has multiple opinions (U-SE),
+             rationales (R) or
+             masking all other tokens ($\neg$SE and $\neg$R)
+             for 25\%, 50\% and 75\% rationale lengths.
+             The majority baselines ``all positive''
+             have 60.0\% and 71.1\% accuracy respectively.}
+    \label{tab:masking:rationales-diagonal}
+\end{table}
+% eof
+""")
