@@ -10,11 +10,6 @@
 
 import sys
 
-tr = sys.argv[1]
-m_type = sys.argv[2]
-
-assert m_type == 'SE' or m_type.startswith('R')
-
 example = """
 ==> c-f-1-1/stdout-training-with-local-aio.txt <==
 
@@ -30,15 +25,45 @@ Summary:
 SeqB                  Q                     Overall               Laptop                Restaurant            Description
 Full     """
 
+trshort2sortkey = {
+    'f': 'tr=Full',
+    's': 'tr=SE/R',
+    'o': 'tr=Y_Other',
+    'a': 'tr=Z_Concat',
+}
+
 run = 0
 while True:
     line = sys.stdin.readline()
     if not line:
         break
     elif line.startswith('==>'):
-        run += 1
+        fields = line.replace('/', ' ').split()
+        #     [1]     [2]
+        # ==> c-f-1-2/stdout-training-with-local-aio.txt <==
+        assert len(fields) == 4
+        folder = fields[1]
+        filename = fields[2]
+        fields = folder.split('-')
+        assert len(fields) == 4
+        assert fields[0] == 'c'
+        run = 3*(int(fields[2])-1) + int(fields[3])
+        tr = trshort2sortkey[fields[1]]
+        if filename == 'stdout.txt':
+            m_type = 'tab2-SE'
+        elif 'with-union-aio' in filename:
+            m_type = 'tab2-U-SE'
+        elif filename.startswith('stdout-training-with-L'):
+            fields = filename.replace('-', ' ').split()
+            aio_name = fields[3].replace('.', ' ').split()[0]
+            m_type = 'tab3-' + aio_name
+        elif filename == 'stdout-training-with-local-aio.txt':
+            m_type = 'tab4-old-R'
+        else:
+            raise ValueError('unsupported path %s/%s' %(folder, filename))
     elif line.startswith('SeqB'):
         fields = line.split('\t')
+        # check column header
         assert fields[3] == 'Laptop'
         assert fields[4] == 'Restaurant'
         assert fields[5].rstrip() == 'Description'
@@ -46,14 +71,15 @@ while True:
         if line.startswith('Full'):
             te = 'Full'
         elif line.startswith('SE'):
-            te = m_type
+            te = 'SE/R'
         elif line.startswith('Other'):
-            te = 'Z-Comp'+m_type if m_type.startswith('R') else 'Z-Other'
+            te = 'Z-CompSE/R'
         else:
             raise ValueError(line)
         for index, domain in enumerate('Laptop Restaurant'.split()):
             score = line.split('\t')[3+index]
             row = []
+            row.append(m_type)
             row.append(tr)
             row.append(domain)
             row.append(te)
