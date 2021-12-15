@@ -24,6 +24,9 @@ for tr_task_short, tr_task_long, hours in [
      ('L50', True,  'best-L50.ckpt'),
      ('L75', True,  'best-L75.ckpt'),
      ('union', True, 'best-union.ckpt'),
+     ('RND25', True, 'best-RND25.ckpt'),
+     ('RND50', True, 'best-RND50.ckpt'),
+     ('RND75', True, 'best-RND75.ckpt'),
   ]:
     for set_rank in (1,2,3):
         with open('run-train-c-%s-%s-%d1-to-%d3.job' %(
@@ -81,6 +84,11 @@ for RUN in 1 2 3 ; do
                 elif aio_name == 'union':
                     f.write("""
             ../scripts/union-aio.py < data/${T}.${D}.aio > $LAIODIR/${T}.${D}.aio
+""" %locals())
+                elif aio_name.startswith('RND'):
+                    rnd_p = float(aio_name[3:]) / 100.0
+                    f.write("""
+            ../scripts/random-aio.py --seed ${SET}${RUN} %(rnd_p).9f < data/${T}.${D}.aio > $LAIODIR/${T}.${D}.aio
 """ %locals())
                 else:
                     raise ValueError('unknown aio_name %s' %aio_name)
