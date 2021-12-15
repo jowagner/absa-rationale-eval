@@ -13,13 +13,6 @@ import sys
 
 debug = False
 
-def bstring(s):
-    if type(b'') is str:
-        return s
-    if type(s) is bytes:
-        return s
-    return s.encode('utf-8')
-
 if sys.argv[1] == '--seed':
     seed = sys.argv[2]
     del sys.argv[2]
