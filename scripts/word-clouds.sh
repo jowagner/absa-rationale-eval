@@ -29,6 +29,8 @@ for R in i o ; do
         wordcloud_cli --background white --color black      \
             --width 800 --height 600                         \
             --text top-text-for-r-is-${R}-and-se-is-${S}.txt  \
+            --no_collocations --no_normalize_plurals           \
+            --include_numbers                                   \
             --imagefile wordcloud-for-r-is-${R}-and-se-is-${S}.png
 
     done
