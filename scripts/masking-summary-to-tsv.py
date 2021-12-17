@@ -98,7 +98,7 @@ while True:
 # create latex tables
 
 f = open('results-masking-diagonal.tex', 'wt')
-f.write(r"""% Table with masking results, diagonale of results from Appendix
+f.write(r"""% Table with masking results, diagonal of results from Appendix
 
 \begin{table}
     %\small
@@ -170,10 +170,10 @@ for domain, maj_acc, baseline_acc in [
         f.write('\n')
 f.write(r"""    \end{tabular}
     \caption{Test set accuracy (x100, average and standard deviation over nine runs)
-             and effect of masking sentiment expressions (SE),
-             union of all SEs where a sentence has multiple opinions (U-SE),
-             rationales (R), random tokens (A) or
-             masking all other tokens ($\neg$SE, $\neg$R, and $\neg$A)
+             and effect of masking sentiment expressions ($\neg$SE),
+             union of all SEs where a sentence has multiple opinions ($\neg$U-SE),
+             rationales ($\neg$R), random tokens ($\neg$A) or
+             masking all other tokens (SE, R, and A)
              for 25\%, 50\% and 75\% lengths.}
     \label{tab:masking:rationales-diagonal}
 \end{table}
