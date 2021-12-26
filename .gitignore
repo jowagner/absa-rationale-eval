@@ -133,6 +133,10 @@ fig*.t??
 *.bz2
 *.tgz
 *.gpg
+*.tsv
+top*.t??
+wordcloud*.*
+results*.*
 
 # work dirs
 c-?-?-?
