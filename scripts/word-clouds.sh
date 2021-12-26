@@ -27,10 +27,11 @@ for R in i o ; do
     for S in i o ; do 
 
         wordcloud_cli --background white --color black      \
-            --width 800 --height 600                         \
+            --width 1280 --height 960                        \
             --text top-text-for-r-is-${R}-and-se-is-${S}.txt  \
             --no_collocations --no_normalize_plurals           \
             --include_numbers                                   \
+	    --stopwords scripts/stopword-distractors.txt         \
             --imagefile wordcloud-for-r-is-${R}-and-se-is-${S}.png
 
     done
