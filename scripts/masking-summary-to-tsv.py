@@ -69,6 +69,7 @@ while True:
     elif line.startswith('SeqB'):
         fields = line.split('\t')
         # check column header
+        assert fields[2] == 'Overall'
         assert fields[3] == 'Laptop'
         assert fields[4] == 'Restaurant'
         assert fields[5].rstrip() == 'Description'
@@ -81,8 +82,8 @@ while True:
             te = 'Z-CompSE/R'
         else:
             raise ValueError(line)
-        for index, domain in enumerate('Laptop Restaurant'.split()):
-            score = line.split('\t')[3+index]
+        for index, domain in enumerate('Overall Laptop Restaurant'.split()):
+            score = line.split('\t')[2+index]
             row = []
             row.append(m_type)
             row.append(tr)
@@ -132,6 +133,7 @@ def get_cell_content(m_type, tr, domain, te):
 for domain, maj_acc, baseline_acc in [
     ('Laptop',     60.0, get_cell_content('tab2-SE', 'tr=Full', 'Laptop', 'Full')),
     ('Restaurant', 71.1, get_cell_content('tab2-SE', 'tr=Full', 'Restaurant', 'Full')),
+    ('Overall',    65.8, get_cell_content('tab2-SE', 'tr=Full', 'Overall', 'Full')),
 ]:
     if domain != 'Laptop':
         f.write(r"""    \multicolumn{3}{l}{} \\
@@ -170,10 +172,10 @@ for domain, maj_acc, baseline_acc in [
         f.write('\n')
 f.write(r"""    \end{tabular}
     \caption{Test set accuracy (x100, average and standard deviation over nine runs)
-             and effect of masking sentiment expressions ($\neg$SE),
-             union of all SEs where a sentence has multiple opinions ($\neg$U-SE),
-             rationales ($\neg$R), random tokens ($\neg$A) or
-             masking all other tokens (SE, R, and A)
+             and effect of restricting input to sentiment expressions (SE),
+             the union of all SEs where a sentence has multiple opinions (U-SE),
+             rationales (R), random tokens (A) and
+             masking all other tokens ($\neg$SE, $\neg$R, and $\neg$A)
              for 25\%, 50\% and 75\% lengths.}
     \label{tab:masking:rationales-diagonal}
 \end{table}
