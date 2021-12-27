@@ -106,7 +106,7 @@ f.write(r"""% Table with masking results, diagonal of results from Appendix
     \centering
     \begin{tabular}{l|rr}
     %\hline
-    \textbf{Mask} & \multicolumn{2}{c}{\textbf{Training and Test Setting}} \\
+    \textbf{Target} & \multicolumn{2}{c}{\textbf{Training and Test Setting}} \\
                    & \textbf{SE/R/A} & \textbf{$\neg$SE/$\neg$R/$\neg$A} \\
     \hline
 """)
@@ -181,5 +181,78 @@ f.write(r"""    \end{tabular}
 \end{table}
 % eof
 """)
+f.close()
 #            The majority baselines ``all positive''
 #            have 60.0\% and 71.1\% accuracy respectively.}
+
+
+# Appendix tables
+
+# SE and U-SE
+
+for m_type, mask_filename, mask_title in [
+    ('tab2-SE',    '0SE',   'SE'),
+    ('tab2-U-SE',  '0U-SE', 'U-SE'),
+    ('tab3-L25',   'L25',   'R@.25'),
+    ('tab3-L50',   'L50',   'R@.5'),
+    ('tab3-L75',   'L75',   'R@.75'),
+    ('tab4-RND25', 'RND25', 'A@.25'),
+    ('tab4-RND50', 'RND50', 'A@.5'),
+    ('tab4-RND75', 'RND75', 'A@.75'),
+]:
+    f = open('results-masking-%s.tex' %mask_filename, 'wt')
+    f.write(r"""%% Table with %(mask_title)s masking results
+
+\begin{table}
+    \centering
+    \begin{tabular}{l|rrr}
+    \textbf{Model} & \multicolumn{3}{c}{\textbf{Test Accuracy}} \\
+                   & \textbf{Full}
+                   & \textbf{%(mask_title)s}
+                   & \textbf{$\neg$%(mask_title)s} \\
+    \hline
+""" %locals())
+
+    for domain, maj_acc, in [
+        ('Laptop',     60.0),
+        ('Restaurant', 71.1),
+        ('Overall',    65.8),
+    ]:
+        if domain != 'Laptop':
+            f.write(r"""    \multicolumn{3}{l}{} \\
+    """)
+        f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
+    \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
+    \hline
+    """ %locals())
+
+        for tr, tr_title in [
+            ('tr=Full',    'Full'),
+            ('tr=SE/R',    mask_title),
+            ('tr=Y_Other', '$\\neg$' + mask_title),
+            ('tr=Z_Concat', 'Concat'),
+        ]:
+            if mask_title.startswith('A@') and tr[3] in 'FZ':
+                continue
+            gap = (11 - len(tr_title)) * ' '
+            f.write(r'    \textbf{%s}%s' %(tr_title, gap))
+            for te in [
+                'Full',
+                'SE/R',
+                'Z-CompSE/R',
+            ]:
+                try:
+                    f.write('& %s ' %get_cell_content(m_type, tr, domain, te))
+                except ValueError:
+                    f.write('& -- ')
+            f.write(r'\\')
+            f.write('\n')
+    f.write(r"""    \end{tabular}
+    \caption{Out of distrubtion settings for %(mask_title)s.}
+    \label{tab:masking:rationales-%(mask_title)s}
+\end{table}
+%% eof
+""" %locals())
+    f.close()
+    #            The majority baselines ``all positive''
+    #            have 60.0\% and 71.1\% accuracy respectively.}
