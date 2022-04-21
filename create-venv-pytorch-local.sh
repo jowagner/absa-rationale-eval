@@ -43,6 +43,7 @@ pytorch-lightning \
 pytorch-nlp \
 tensorboard \
 lightning-transformers \
+wordcloud \
 ; do
     echo
     echo "Installing $I"

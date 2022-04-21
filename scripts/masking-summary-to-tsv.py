@@ -58,13 +58,18 @@ while True:
             fields = filename.replace('-', ' ').split()
             aio_name = fields[3].replace('.', ' ').split()[0]
             m_type = 'tab3-' + aio_name
+        elif filename.startswith('stdout-training-with-RND'):
+            fields = filename.replace('-', ' ').split()
+            aio_name = fields[3].replace('.', ' ').split()[0]
+            m_type = 'tab4-' + aio_name
         elif filename == 'stdout-training-with-local-aio.txt':
-            m_type = 'tab4-old-R'
+            m_type = 'tab5-old-R'
         else:
             raise ValueError('unsupported path %s/%s' %(folder, filename))
     elif line.startswith('SeqB'):
         fields = line.split('\t')
         # check column header
+        assert fields[2] == 'Overall'
         assert fields[3] == 'Laptop'
         assert fields[4] == 'Restaurant'
         assert fields[5].rstrip() == 'Description'
@@ -77,8 +82,8 @@ while True:
             te = 'Z-CompSE/R'
         else:
             raise ValueError(line)
-        for index, domain in enumerate('Laptop Restaurant'.split()):
-            score = line.split('\t')[3+index]
+        for index, domain in enumerate('Overall Laptop Restaurant'.split()):
+            score = line.split('\t')[2+index]
             row = []
             row.append(m_type)
             row.append(tr)
@@ -94,29 +99,61 @@ while True:
 # create latex tables
 
 f = open('results-masking-diagonal.tex', 'wt')
-f.write(r"""% Table with masking results, diagonale of results from Appendix
+f.write(r"""% Table with masking results, diagonal of results from Appendix
 
 \begin{table}
     %\small
     \centering
-    \begin{tabular}{l|rrr}
+    \begin{tabular}{l|rr}
     %\hline
-    \textbf{Mask} & \multicolumn{3}{c}{\textbf{Training and Test Setting}} \\
-                   & \textbf{Full} & \textbf{SE/R} & \textbf{$\neg$SE/$\neg$R} \\
+    \textbf{Target} & \multicolumn{2}{c}{\textbf{Training and Test Setting}} \\
+                   & \textbf{SE/R/A} & \textbf{$\neg$SE/$\neg$R/$\neg$A} \\
     \hline
 """)
 
-for domain in ('Laptop', 'Restaurant'):
-    f.write(r"""    \multicolumn{4}{l}{Test set: %(domain)s} \\
+def get_cell_content(m_type, tr, domain, te):
+    scores = []
+    for run in range(1,10):
+        key = (m_type, tr, domain, te, run)
+        if key in data:
+            scores.append(data[key])
+    assert len(scores) == 9
+    avg_score = sum(scores)/float(len(scores))
+    sq_errors = []
+    for score in scores:
+        error = avg_score - score
+        sq_errors.append(error**2)
+    n = len(scores)
+    #std_dev = (sum(sq_errors)/float(n))**0.5                   # Population std dev
+    #std_dev = (sum(sq_errors)/(n-1.0))**0.5                    # Simple sample std dev
+    #std_dev = (sum(sq_errors)/(n-1.5))**0.5                    # Approximate std dev
+    std_dev = (sum(sq_errors)/(n-1.5+1.0/(8.0*(n-1.0))))**0.5  # More accurate std dev
+    return r'%.1f $\pm %.1f$' %(avg_score, std_dev)
+
+for domain, maj_acc, baseline_acc in [
+    ('Laptop',     60.0, get_cell_content('tab2-SE', 'tr=Full', 'Laptop', 'Full')),
+    ('Restaurant', 71.1, get_cell_content('tab2-SE', 'tr=Full', 'Restaurant', 'Full')),
+    ('Overall',    65.8, get_cell_content('tab2-SE', 'tr=Full', 'Overall', 'Full')),
+]:
+    if domain != 'Laptop':
+        f.write(r"""    \multicolumn{3}{l}{} \\
+""")
+    f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
+    \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
+    \multicolumn{3}{l}{Unmasked (Full): %(baseline_acc)s} \\
     \hline
 """ %locals())
     for m_type, mask_title in [
         ('tab2-SE',   'SE'),
         ('tab2-U-SE', 'U-SE'),
         (None, None),            # = hline separator
-        ('tab3-L25',  '@.25'),
-        ('tab3-L50',  '@.5'),
-        ('tab3-L75',  '@.75'),
+        ('tab3-L25',  'R@.25'),
+        ('tab3-L50',  'R@.5'),
+        ('tab3-L75',  'R@.75'),
+        (None, None),            # = hline separator
+        ('tab4-RND25',  'A@.25'),
+        ('tab4-RND50',  'A@.5'),
+        ('tab4-RND75',  'A@.75'),
         (None, None),            # = hline separator
     ]:
         if not m_type:
@@ -126,37 +163,96 @@ for domain in ('Laptop', 'Restaurant'):
         gap = (5 - len(mask_title)) * ' '
         f.write(r'    \textbf{%s}%s' %(mask_title, gap))
         for tr, te in [
-            ('tr=Full',    'Full'),
+            #('tr=Full',    'Full'),
             ('tr=SE/R',    'SE/R'),
             ('tr=Y_Other', 'Z-CompSE/R'),
         ]:
-            scores = []
-            for run in range(1,10):
-                key = (m_type, tr, domain, te, run)
-                scores.append(data[key])
-            avg_score = sum(scores)/float(len(scores))
-            sq_errors = []
-            for score in scores:
-                error = avg_score - score
-                sq_errors.append(error**2)
-            n = len(scores)
-            #std_dev = (sum(sq_errors)/float(n))**0.5                   # Population std dev
-            #std_dev = (sum(sq_errors)/(n-1.0))**0.5                    # Simple sample std dev
-            #std_dev = (sum(sq_errors)/(n-1.5))**0.5                    # Approximate std dev
-            std_dev = (sum(sq_errors)/(n-1.5+1.0/(8.0*(n-1.0))))**0.5  # More accurate std dev
-            f.write(r'& %.1f $\pm %.1f$ ' %(avg_score, std_dev))
+            f.write(r'& %s ' %get_cell_content(m_type, tr, domain, te))
         f.write(r'\\')
         f.write('\n')
 f.write(r"""    \end{tabular}
     \caption{Test set accuracy (x100, average and standard deviation over nine runs)
-             and effect of masking sentiment expressions (SE),
-             union of all SEs where a sentence has multiple opinions (U-SE),
-             rationales (R) or
-             masking all other tokens ($\neg$SE and $\neg$R)
-             for 25\%, 50\% and 75\% rationale lengths.
-             The majority baselines ``all positive''
-             have 60.0\% and 71.1\% accuracy respectively.}
+             and effect of restricting input to sentiment expressions (SE),
+             the union of all SEs where a sentence has multiple opinions (U-SE),
+             rationales (R), random tokens (A) and
+             masking all other tokens ($\neg$SE, $\neg$R, and $\neg$A)
+             for 25\%, 50\% and 75\% lengths.}
     \label{tab:masking:rationales-diagonal}
 \end{table}
 % eof
 """)
+f.close()
+#            The majority baselines ``all positive''
+#            have 60.0\% and 71.1\% accuracy respectively.}
+
+
+# Appendix tables
+
+# SE and U-SE
+
+for m_type, mask_filename, mask_title in [
+    ('tab2-SE',    '0SE',   'SE'),
+    ('tab2-U-SE',  '0U-SE', 'U-SE'),
+    ('tab3-L25',   'L25',   'R@.25'),
+    ('tab3-L50',   'L50',   'R@.5'),
+    ('tab3-L75',   'L75',   'R@.75'),
+    ('tab4-RND25', 'RND25', 'A@.25'),
+    ('tab4-RND50', 'RND50', 'A@.5'),
+    ('tab4-RND75', 'RND75', 'A@.75'),
+]:
+    f = open('results-masking-%s.tex' %mask_filename, 'wt')
+    f.write(r"""%% Table with %(mask_title)s masking results
+
+\begin{table}
+    \centering
+    \begin{tabular}{l|rrr}
+    \textbf{Model} & \multicolumn{3}{c}{\textbf{Test Accuracy}} \\
+                   & \textbf{Full}
+                   & \textbf{%(mask_title)s}
+                   & \textbf{$\neg$%(mask_title)s} \\
+    \hline
+""" %locals())
+
+    for domain, maj_acc, in [
+        ('Laptop',     60.0),
+        ('Restaurant', 71.1),
+        ('Overall',    65.8),
+    ]:
+        if domain != 'Laptop':
+            f.write(r"""    \multicolumn{3}{l}{} \\
+    """)
+        f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
+    \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
+    \hline
+    """ %locals())
+
+        for tr, tr_title in [
+            ('tr=Full',    'Full'),
+            ('tr=SE/R',    mask_title),
+            ('tr=Y_Other', '$\\neg$' + mask_title),
+            ('tr=Z_Concat', 'Concat'),
+        ]:
+            if mask_title.startswith('A@') and tr[3] in 'FZ':
+                continue
+            gap = (11 - len(tr_title)) * ' '
+            f.write(r'    \textbf{%s}%s' %(tr_title, gap))
+            for te in [
+                'Full',
+                'SE/R',
+                'Z-CompSE/R',
+            ]:
+                try:
+                    f.write('& %s ' %get_cell_content(m_type, tr, domain, te))
+                except ValueError:
+                    f.write('& -- ')
+            f.write(r'\\')
+            f.write('\n')
+    f.write(r"""    \end{tabular}
+    \caption{Out of distrubtion settings for %(mask_title)s.}
+    \label{tab:masking:rationales-%(mask_title)s}
+\end{table}
+%% eof
+""" %locals())
+    f.close()
+    #            The majority baselines ``all positive''
+    #            have 60.0\% and 71.1\% accuracy respectively.}
