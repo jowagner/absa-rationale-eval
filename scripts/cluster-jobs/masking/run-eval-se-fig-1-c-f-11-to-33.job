@@ -1,0 +1,36 @@
+#!/bin/bash
+  
+#SBATCH -p compute       # which partition to run on
+#SBATCH --gres=gpu:rtx2080ti:1
+#SBATCH -J absa-2h    # name for the job
+#SBATCH --mem=47000
+#SBATCH --cpus-per-task=4
+#SBATCH --ntasks=1
+#SBATCH -N 1-1
+
+
+PRJ_DIR=${HOME}/sentiment/absa-rationale-eval
+cd $PRJ_DIR
+source venv-pytorch/bin/activate
+
+for SET in 1 2 3 ; do
+for RUN in 1 2 3 ; do
+    echo "== Run $RUN =="
+    date
+    cd $PRJ_DIR
+    MODEL_DIR=c-f-${SET}-${RUN}
+    #mkdir $MODEL_DIR
+    cd $MODEL_DIR
+    mv best-model-weights-only.ckpt $(mktemp -u best-model-weights-only-XXXXXXXXXXXX.ckpt)
+    ln -s best-model-se-fig-1-aug.ckpt best-model-weights-only.ckpt
+    ln -s ../data
+    hostname >> eval.start
+    date >> eval.start
+    echo $MODEL_DIR >> eval.start
+    touch eval.start
+    ../scripts/train-classifier.py ${SET}${RUN} eval Full 2> stderr-eval-1208-gpu.txt > stdout-eval-1208-gpu.txt
+    touch eval.end
+    date
+    echo "done"
+done
+done
