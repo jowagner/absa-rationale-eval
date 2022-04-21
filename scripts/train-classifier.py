@@ -101,7 +101,7 @@ virtual_batch_size  = 64
 # but they themselves warn that "naively" doing so can degrade performance
 
 max_epochs = 10
-limit_train_batches = 1.0     # fraction of training data to use
+limit_train_batches = 1.0  # fraction of training data to use, e.g. 0.05 during debugging
 
 hparams = {
     "encoder_learning_rate": 1e-05,  # Encoder specific learning rate
@@ -140,7 +140,6 @@ tokeniser = AutoTokenizer.from_pretrained(model_name)
 # 1.2 Dataset Configuration
 
 domains = ['laptop', 'restaurant']
-#domains = ['restaurant']
 
 train_dev_split = (95, 5)
 
@@ -425,13 +424,31 @@ print('\nnumber of unique targets:',  len(te_observed_targets))
 
 import random
 
-# how many instances are there for each label?
+# find out which sentences are used more than once
+
+sent2count = {}
+for item in tr_dataset:
+    domain   = item[0]
+    op_id    = item[1]
+    sent_id  = op_id[:op_id.rfind(':')]
+    key = (domain, sent_id)
+    if not key in sent2count:
+        sent2count[key] = 0
+    sent2count[key] += 1
+
+# find instances for each (domain, polarity) pair,
+# keeping instances that share a sentence separate
 
 group2indices = {}
 for index, item in enumerate(tr_dataset):
     domain   = item[0]
+    op_id    = item[1]
     polarity = item[-1]
-    group = (domain, polarity)
+    sent_id  = op_id[:op_id.rfind(':')]
+    if sent2count[(domain, sent_id)] == 1:
+        group = (domain, polarity)
+    else:
+        group = (domain, 'special')
     if not group in group2indices:
         group2indices[group] = []
     group2indices[group].append(index)
