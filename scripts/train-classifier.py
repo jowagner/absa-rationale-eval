@@ -8,6 +8,7 @@
 
 # Author: Joachim Wagner
 
+import hashlib
 import numpy as np
 import os
 import random
@@ -24,6 +25,7 @@ opt_save_model_as   = 'best-model-weights-only.ckpt'
 opt_load_model_from = 'best-model-weights-only.ckpt'
 lmf_specified = False
 aio_prefix = None
+seed_for_trdev_split = None  # None = use global seed
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
@@ -46,6 +48,9 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         del sys.argv[1]
     elif option == '--saliencies-from':
         opt_saliencies_from.append(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--trdev-seed', '--seed-for-tr-dev-split'):
+        seed_for_trdev_split = int(sys.argv[1])
         del sys.argv[1]
     else:
         print('Unknown option', option)
@@ -424,6 +429,10 @@ print('\nnumber of unique targets:',  len(te_observed_targets))
 
 import random
 
+if seed_for_trdev_split is None:
+    seed_for_trdev_split = seed
+rnd = random.Random(seed_for_trdev_split)
+
 # find out which sentences are used more than once
 
 sent2count = {}
@@ -470,9 +479,30 @@ for group in group2indices:
         group, select, 100.0*select/float(n),
         remaining, 100.0*remaining/float(n),
     ))
-    random.shuffle(indices)
-    tr_indices += indices[:select]
-    dev_indices += indices[select:]
+    if group[1] != 'special':
+        rnd.shuffle(indices)
+        tr_indices += indices[:select]
+        dev_indices += indices[select:]
+    else:
+        # randomise via hash of sent_id so that items with the
+        # same sentence stay together
+        hash2items = {}
+        for index in indices:
+            item = tr_dataset[index]
+            op_id   = item[1]
+            sent_id = op_id[:op_id.rfind(':')]
+            key = hashlib.sha256('%d:%s:%s' %(seed_for_trdev_split, domain, sent_id)).digest()
+            if key not in hash2items:
+                hash2items[key] = []
+            hash2items[key].append(index)
+        added_to_tr = 0
+        for key in sorted(list(hash2items.keys())):
+            if added_to_tr < select:
+                tr_indices += hash2items[key]
+                added_to_tr += len(hash2items[key])
+            else:
+                dev_indices += hash2items[key]
+        hash2items = None  # free memory
 
 tr_indices.sort()
 dev_indices.sort()
