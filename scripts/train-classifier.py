@@ -519,9 +519,10 @@ def get_subset(dataset, indices):  # TODO: this probably can be replaced with []
 dev_dataset = get_subset(tr_dataset, dev_indices)
 tr_dataset  = get_subset(tr_dataset, tr_indices)
 
-def print_distribution(dataset, prefix = ''):
+def print_distribution_and_fingerprint(dataset, prefix = ''):
     n = len(dataset)
     group2count = {}
+    op_ids = []
     for item in dataset:
         domain   = item[0]
         polarity = item[-1]
@@ -529,11 +530,19 @@ def print_distribution(dataset, prefix = ''):
         if not key in group2count:
             group2count[key] = 0
         group2count[key] += 1
+        op_ids.append(item[1])
     for domain, label in sorted(list(group2count.keys())):
         count = group2count[(domain, label)]
         print('%s%s\t%s\t%d\t%.1f%%' %(
-            domain, label, count, 100.0 * count / float(n)
+            prefix, domain, label, count, 100.0 * count / float(n)
         ))
+    print('%sdataset fingerprint: %s' %(
+        prefix, hashlib.sha256('\n'.join(op_ids)).hexdigest()
+    ))
+    op_ids.sort()
+    print('%ssorted bag of items: %s' %(
+        prefix, hashlib.sha256('\n'.join(op_ids)).hexdigest()
+    ))
 
 print()
 print('Training data size:', len(tr_dataset))
