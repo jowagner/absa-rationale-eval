@@ -474,15 +474,12 @@ for group in group2indices:
     indices = group2indices[group]
     n = len(indices)
     select = (n * rel_train_size) // rel_total
-    remaining = n - select
-    print('%r: split %d (%.1f%%) to %d (%.1f%%)' %(
-        group, select, 100.0*select/float(n),
-        remaining, 100.0*remaining/float(n),
-    ))
     if group[1] != 'special':
         rnd.shuffle(indices)
         tr_indices += indices[:select]
         dev_indices += indices[select:]
+        added_to_tr = select
+        added_to_dev = n - select
     else:
         # randomise via hash of sent_id so that items with the
         # same sentence stay together
@@ -496,13 +493,19 @@ for group in group2indices:
                 hash2items[key] = []
             hash2items[key].append(index)
         added_to_tr = 0
+        added_to_dev = 0
         for key in sorted(list(hash2items.keys())):
             if added_to_tr < select:
                 tr_indices += hash2items[key]
                 added_to_tr += len(hash2items[key])
             else:
                 dev_indices += hash2items[key]
+                added_to_dev += len(hash2items[key])
         hash2items = None  # free memory
+    print('%r: split %d (%.1f%%) to %d (%.1f%%)' %(
+        group, added_to_tr, 100.0*added_to_tr/float(n),
+        added_to_dev, 100.0*added_to_dev/float(n),
+    ))
 
 tr_indices.sort()
 dev_indices.sort()
@@ -516,9 +519,27 @@ def get_subset(dataset, indices):  # TODO: this probably can be replaced with []
 dev_dataset = get_subset(tr_dataset, dev_indices)
 tr_dataset  = get_subset(tr_dataset, tr_indices)
 
+def print_distribution(dataset, prefix = ''):
+    n = len(dataset)
+    group2count = {}
+    for item in dataset:
+        domain   = item[0]
+        polarity = item[-1]
+        key = (domain, polarity)
+        if not key in group2count:
+            group2count[key] = 0
+        group2count[key] += 1
+    for domain, label in sorted(list(group2count.keys())):
+        count = group2count[(domain, label)]
+        print('%s%s\t%s\t%d\t%.1f%%' %(
+            domain, label, count, 100.0 * count / float(n)
+        ))
+
 print()
 print('Training data size:', len(tr_dataset))
+print_distribution(tr_dataset, '\t')
 print('Development data size:', len(dev_dataset))
+print_distribution(dev_dataset, '\t')
 
 
 # 2.3 PyTorch DataLoader
