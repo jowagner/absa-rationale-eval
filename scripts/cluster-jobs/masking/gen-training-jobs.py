@@ -27,10 +27,10 @@ while True:
  nep = int(fields[5])
 
  for tr_task_short, tr_task_long, hours in [
-     ('f', 'Full',  int(1+0.05*nep)),
-     ('s', 'SE',    int(1+0.05*nep)),
-     ('o', 'Other', int(1+0.05*nep)),
-     ('a', 'All',   int(1+0.15*nep)),
+     ('f', 'Full',  int(1+3*0.05*nep)),
+     ('s', 'SE',    int(1+3*0.05*nep)),
+     ('o', 'Other', int(1+3*0.05*nep)),
+     ('a', 'All',   int(1+3*0.15*nep)),
  ]:
   for aio_name, local_aio, save_as in [
      ('sea', False, 'best-sea.ckpt'),
