@@ -12,12 +12,26 @@ import sys
 
 local_aio = True
 
-for tr_task_short, tr_task_long, hours in [
-    ('f', 'Full',  2),
-    ('s', 'SE',    2),
-    ('o', 'Other', 2),
-    ('a', 'All',   6),
-]:
+fhp = open('../../hparams.txt', 'rt')
+while True:
+ line = fhp.readline()
+ if not line:
+     break
+ # print(seed, lr1, lr2, fre, vbs, neps[0])
+ fields = line.split()
+ hparam = int(fields[0])
+ lr1 = int(fields[1])
+ lr2 = int(fields[2])
+ fre = int(fields[3])
+ vbs = int(fields[4])
+ nep = int(fields[5])
+
+ for tr_task_short, tr_task_long, hours in [
+     ('f', 'Full',  int(1+0.05*nep)),
+     ('s', 'SE',    int(1+0.05*nep)),
+     ('o', 'Other', int(1+0.05*nep)),
+     ('a', 'All',   int(1+0.15*nep)),
+ ]:
   for aio_name, local_aio, save_as in [
      ('sea', False, 'best-sea.ckpt'),
      ('L25', True,  'best-L25.ckpt'),
@@ -29,8 +43,8 @@ for tr_task_short, tr_task_long, hours in [
      ('RND75', True, 'best-RND75.ckpt'),
   ]:
     for set_rank in (1,2,3):
-        with open('run-train-c-%s-%s-%d1-to-%d3.job' %(
-            aio_name, tr_task_short, set_rank, set_rank
+        with open('run-train-c-%s-%s-%d1-to-%d3-hp-%d.job' %(
+            aio_name, tr_task_short, set_rank, set_rank, hparam
         ), 'w') as f:
             f.write("""#!/bin/bash
 
@@ -46,6 +60,7 @@ for tr_task_short, tr_task_long, hours in [
 TR_TASK=%(tr_task_long)s
 TR_TASK_SHORT=%(tr_task_short)s
 SET=%(set_rank)d
+HPARAM=%(hparam)d
 L=%(aio_name)s
 """ %locals())
             f.write("""
@@ -61,7 +76,8 @@ for RUN in 1 2 3 ; do
     echo "== Run $RUN =="
     date
     cd $PRJ_DIR
-    MODEL_DIR=c-${TR_TASK_SHORT}-${SET}-${RUN}
+    MODEL_DIR_PREFIX=c-${TR_TASK_SHORT}-${SET}-${RUN}
+    MODEL_DIR=${MODEL_DIR_PREFIX}-${HPARAM}
     mkdir $MODEL_DIR
     cd $MODEL_DIR
     mv best-model-weights-only.ckpt $(mktemp -u best-model-weights-only-XXXXXXXXXXXX.ckpt)
@@ -107,16 +123,18 @@ for RUN in 1 2 3 ; do
 
             if local_aio:
                 f.write("""
-    ../scripts/train-classifier.py --aio-prefix $LAIODIR/ --save-model-as %(save_as)s ${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --aio-prefix $LAIODIR/ --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
             else:
                 f.write("""
-    ../scripts/train-classifier.py --save-model-as %(save_as)s ${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
 
             f.write("""
     date >> ${DESC}.end
     touch ${DESC}.end
+    cd $PRJ_DIR
+    ./pick-model.py ${MODEL_DIR_PREFIX} ${DESC}
     date
     echo "done"
 done
