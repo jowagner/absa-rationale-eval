@@ -26,6 +26,11 @@ opt_load_model_from = 'best-model-weights-only.ckpt'
 lmf_specified = False
 aio_prefix = None
 seed_for_trdev_split = None  # None = use global seed
+opt_lr1 = 10 / 1000000.0
+opt_lr2 = 30 / 1000000.0
+opt_frozen_epochs = 0
+opt_vbatchsize = 64
+opt_epochs = 25
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
@@ -36,6 +41,21 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         aio_prefix = 'local-aio/'
     elif option == '--aio-prefix':
         aio_prefix = sys.argv[1]
+        del sys.argv[1]
+    elif option in ('--lr1', '--learning-rate-1'):
+        opt_lr1 = float(sys.argv[1]) / 1000000.0
+        del sys.argv[1]
+    elif option in ('--lr2', '--learning-rate-2'):
+        opt_lr2 = float(sys.argv[1]) / 1000000.0
+        del sys.argv[1]
+    elif option in ('--fre', '--frozen-epochs'):
+        opt_frozen_epochs = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--vbs', '--virt-batch-size'):
+        opt_vbatchsize = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--epochs'):
+        opt_epochs = int(sys.argv[1])
         del sys.argv[1]
     elif option in ('--save-as', '--save-model', '--save-model-as'):
         opt_save_model_as = sys.argv[1]
@@ -99,19 +119,19 @@ get_training_saliencies = True   # also print saliencies for training data in ad
 model_size          = 'base'  # choose between 'tiny', 'base' and 'large'
 max_sequence_length = 256
 batch_size          = 8       # 10 should work on a 12 GB card if not also used for graphics / GUI
-virtual_batch_size  = 64
+virtual_batch_size  = opt_vbatchsize
 
 # TODO: what virtual batch size should we use
 # https://arxiv.org/abs/1904.00962 are cited to say a large batch size (32k) is better
 # but they themselves warn that "naively" doing so can degrade performance
 
-max_epochs = 10
+max_epochs = opt_epochs
 limit_train_batches = 1.0  # fraction of training data to use, e.g. 0.05 during debugging
 
 hparams = {
-    "encoder_learning_rate": 1e-05,  # Encoder specific learning rate
-    "learning_rate":         3e-05,  # Classification head learning rate
-    "nr_frozen_epochs":      3,      # Number of epochs we want to keep the encoder model frozen
+    "encoder_learning_rate": opt_lr1,  # Encoder specific learning rate
+    "learning_rate":         opt_lr2,  # Classification head learning rate
+    "nr_frozen_epochs":      opt_frozen_epochs,      # Number of epochs we want to keep the encoder model frozen
     "loader_workers":        4,      # How many subprocesses to use for data loading.
                                      # (0 means that the data will be loaded in the main process)
     "batch_size":            batch_size,
