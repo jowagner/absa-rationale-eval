@@ -568,9 +568,9 @@ def print_distribution_and_fingerprint(dataset, prefix = ''):
 
 print()
 print('Training data size:', len(tr_dataset))
-print_distribution(tr_dataset, '\t')
+print_distribution_and_fingerprint(tr_dataset, '\t')
 print('Development data size:', len(dev_dataset))
-print_distribution(dev_dataset, '\t')
+print_distribution_and_fingerprint(dev_dataset, '\t')
 
 
 # 2.3 PyTorch DataLoader
