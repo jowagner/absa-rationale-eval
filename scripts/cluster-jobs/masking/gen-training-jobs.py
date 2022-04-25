@@ -131,6 +131,7 @@ for RUN in 1 2 3 ; do
 """ %locals())
 
             f.write("""
+    rm -rf lightning_logs
     date >> ${DESC}.end
     touch ${DESC}.end
     cd $PRJ_DIR
