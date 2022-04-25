@@ -508,7 +508,9 @@ for group in group2indices:
             item = tr_dataset[index]
             op_id   = item[1]
             sent_id = op_id[:op_id.rfind(':')]
-            key = hashlib.sha256('%d:%s:%s' %(seed_for_trdev_split, domain, sent_id)).digest()
+            key = '%d:%s:%s' %(seed_for_trdev_split, domain, sent_id)
+            key = key.encode('UTF-8')
+            key = hashlib.sha256(key).digest()
             if key not in hash2items:
                 hash2items[key] = []
             hash2items[key].append(index)
@@ -550,18 +552,18 @@ def print_distribution_and_fingerprint(dataset, prefix = ''):
         if not key in group2count:
             group2count[key] = 0
         group2count[key] += 1
-        op_ids.append(item[1])
+        op_ids.append(item[1].encode('UTF-8'))
     for domain, label in sorted(list(group2count.keys())):
         count = group2count[(domain, label)]
         print('%s%s\t%s\t%d\t%.1f%%' %(
             prefix, domain, label, count, 100.0 * count / float(n)
         ))
     print('%sdataset fingerprint: %s' %(
-        prefix, hashlib.sha256('\n'.join(op_ids)).hexdigest()
+        prefix, hashlib.sha256(b'\n'.join(op_ids)).hexdigest()
     ))
     op_ids.sort()
     print('%ssorted bag of items: %s' %(
-        prefix, hashlib.sha256('\n'.join(op_ids)).hexdigest()
+        prefix, hashlib.sha256(b'\n'.join(op_ids)).hexdigest()
     ))
 
 print()
