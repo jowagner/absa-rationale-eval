@@ -1,7 +1,34 @@
 #!/usr/bin/env python
 
+import hashlib
 import os
+import random
 import sys
+
+def usage():
+    print('Usage: $0 [options] model-dir-prefix model-name')
+    # TODO: print more details how to use this script
+
+opt_seed = b'101'
+opt_dry_run = False
+while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
+    option = sys.argv[1].replace('_', '-')
+    del sys.argv[1]
+    if option in ('-h', '--help'):
+        usage()
+        sys.exit(0)
+    elif option == '--seed':
+        opt_seed = sys.argv[1].encode('utf-8')
+        del sys.argv[1]
+        if not opt_seed:
+            # use system randomness as non-deterministic seed
+            opt_seed = b'%064x' %random.getrandbits(256)
+    elif option in ('-n', '--dry-run'):
+        opt_dry_run = True
+    else:
+        print('Unknown option', option)
+        usage()
+        sys.exit(1)
 
 model_dir_prefix = sys.argv[1]  # e.g. c-f-3-3 (without -${HPARAM})
 model_name       = sys.argv[2]  # e.g. training-with-sea-aio
@@ -45,7 +72,10 @@ for entry in os.listdir():
             assert fields[6].startswith('device=')
             score = float(fields[5])
             print('\tdetected score', score)
-            found.append((-score, model_path))
+            tie_breaker = hashlib.sha256('%d:%s:%s' %(
+                len(opt_seed), opt_seed, model.path.encode('utf-8')
+            )).hexdigest()
+            found.append((-score, tie_breaker, model_path))
             break
     f.close()
 
@@ -53,6 +83,7 @@ assert found  # script is only supposed to be run after a model has been trained
 found.sort()
 print('Keeping', found[0][1])
 print('Deleting:')
-for _, model_path in found[1:]:
+for _, _, model_path in found[1:]:
     print('\t%s' %model_path)
-    os.unlink(model_path)
+    if not opt_dry_run:
+        os.unlink(model_path)
