@@ -49,9 +49,10 @@ for entry in os.listdir():
             break
     f.close()
 
-assert found
+assert found  # script is only supposed to be run after a model has been trained successfully
 found.sort()
 print('Keeping', found[0][1])
 print('Deleting:')
 for _, model_path in found[1:]:
     print('\t%s' %model_path)
+    os.rename(model_path, model_path+'.delete-me')
