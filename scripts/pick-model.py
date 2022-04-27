@@ -72,8 +72,8 @@ for entry in os.listdir():
             assert fields[6].startswith('device=')
             score = float(fields[5])
             print('\tdetected score', score)
-            tie_breaker = hashlib.sha256('%d:%s:%s' %(
-                len(opt_seed), opt_seed, model.path.encode('utf-8')
+            tie_breaker = hashlib.sha256(b'%d:%s:%s' %(
+                len(opt_seed), opt_seed, model_path.encode('utf-8')
             )).hexdigest()
             found.append((-score, tie_breaker, model_path))
             break
@@ -81,9 +81,14 @@ for entry in os.listdir():
 
 assert found  # script is only supposed to be run after a model has been trained successfully
 found.sort()
-print('Keeping', found[0][1])
-print('Deleting:')
-for _, _, model_path in found[1:]:
+print('Keeping', found[0][-1])
+del found[0]
+found.sort(key=lambda item: item[-1])
+if opt_dry_run:
+    print('Would delete if not in dry-run mode:')
+else:
+    print('Deleting:')
+for _, _, model_path in found:
     print('\t%s' %model_path)
     if not opt_dry_run:
         os.unlink(model_path)
