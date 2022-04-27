@@ -6,7 +6,11 @@ import sys
 model_dir_prefix = sys.argv[1]  # e.g. c-f-3-3 (without -${HPARAM})
 model_name       = sys.argv[2]  # e.g. training-with-sea-aio
 
+assert model_name.startswith('training-with-')
+assert model_name.endswith('-aio')
+
 log_name = 'stdout-%s.txt' %model_name
+ckpt_name = 'best-%s.ckpt' %(model_name[14:-4])
 
 example = """
 Best validation set accuracy: tensor(0.8536, device='cuda:0')
@@ -17,7 +21,7 @@ for entry in os.listdir():
     if not entry.startswith(model_dir_prefix):
         continue
     print('checking', entry)
-    model_path = os.path.join(entry, 'best.ckpt')
+    model_path = os.path.join(entry, ckpt_name)
     if not os.path.exists(model_path):
         print('\tmodel file not found: previously deleted or not ready yet --> skipping folder')
         continue
