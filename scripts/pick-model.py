@@ -11,6 +11,7 @@ def usage():
 
 opt_seed = b'101'
 opt_dry_run = False
+opt_verbose = False
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
@@ -23,6 +24,8 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
         if not opt_seed:
             # use system randomness as non-deterministic seed
             opt_seed = b'%064x' %random.getrandbits(256)
+    elif option == --verbose:
+        opt_verbose = True
     elif option in ('-n', '--dry-run'):
         opt_dry_run = True
     else:
@@ -47,14 +50,14 @@ found = []
 for entry in os.listdir():
     if not entry.startswith(model_dir_prefix):
         continue
-    print('checking', entry)
+    if opt_verbose: print('checking', entry)
     model_path = os.path.join(entry, ckpt_name)
     if not os.path.exists(model_path):
-        print('\tmodel file not found: previously deleted or not ready yet --> skipping folder')
+        if opt_verbose: print('\tmodel file not found: previously deleted or not ready yet --> skipping folder')
         continue
     log_path = os.path.join(entry, log_name)
     if not os.path.exists(log_path):
-        print('\tlog file not found')
+        if opt_verbose: print('\tlog file not found')
         continue
     f = open(log_path, 'rt')
     while True:
@@ -71,7 +74,7 @@ for entry in os.listdir():
             assert fields[4] == 'tensor'
             assert fields[6].startswith('device=')
             score = float(fields[5])
-            print('\tdetected score', score)
+            if opt_verbose: print('\tdetected score', score)
             tie_breaker = hashlib.sha256(b'%d:%s:%s' %(
                 len(opt_seed), opt_seed, model_path.encode('utf-8')
             )).hexdigest()
@@ -81,13 +84,15 @@ for entry in os.listdir():
 
 assert found  # script is only supposed to be run after a model has been trained successfully
 found.sort()
-print('Keeping', found[0][-1])
+print('Keeping', found[0][-1], 'with score', -found[0][0])
 del found[0]
 found.sort(key=lambda item: item[-1])
 if opt_dry_run:
     print('Would delete if not in dry-run mode:')
-else:
+elif found:
     print('Deleting:')
+else:
+    print('Nothing to delete')
 for _, _, model_path in found:
     print('\t%s' %model_path)
     if not opt_dry_run:
