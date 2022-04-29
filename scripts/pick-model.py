@@ -81,7 +81,7 @@ for entry in os.listdir():
             assert fields[6].startswith('device=')
             score = float(fields[5])
             if opt_verbose: print('\tdetected score', score)
-            if model_path in None:
+            if model_path is None:
                 tie_breaker = 'zzz'  # place after all other entries
             else:
                 tie_breaker = hashlib.sha256(b'%d:%s:%s' %(
