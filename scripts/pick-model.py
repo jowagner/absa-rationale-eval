@@ -56,10 +56,10 @@ for entry in os.listdir():
     if opt_verbose: print('checking', entry)
     model_path = os.path.join(entry, ckpt_name)
     if not os.path.exists(model_path):
-        if opt_verbose: print('\tmodel file not found: previously deleted or not ready yet --> skipping folder')
         if opt_get_all_scores:
             model_path = ''
         else:
+            if opt_verbose: print('\tmodel file not found: previously deleted or not ready yet --> skipping folder')
             continue
     log_path = os.path.join(entry, log_name)
     if not os.path.exists(log_path):
