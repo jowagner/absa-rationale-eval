@@ -24,7 +24,7 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
         if not opt_seed:
             # use system randomness as non-deterministic seed
             opt_seed = b'%064x' %random.getrandbits(256)
-    elif option == --verbose:
+    elif option == '--verbose':
         opt_verbose = True
     elif option in ('-n', '--dry-run'):
         opt_dry_run = True
