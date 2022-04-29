@@ -12,6 +12,7 @@ def usage():
 opt_seed = b'101'
 opt_dry_run = False
 opt_verbose = False
+opt_get_all_scores = False
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
@@ -26,6 +27,8 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
             opt_seed = b'%064x' %random.getrandbits(256)
     elif option == '--verbose':
         opt_verbose = True
+    elif option == '--get-all-scores':
+        opt_get_all_scores = True
     elif option in ('-n', '--dry-run'):
         opt_dry_run = True
     else:
@@ -54,7 +57,10 @@ for entry in os.listdir():
     model_path = os.path.join(entry, ckpt_name)
     if not os.path.exists(model_path):
         if opt_verbose: print('\tmodel file not found: previously deleted or not ready yet --> skipping folder')
-        continue
+        if opt_get_all_scores:
+            model_path = None
+        else:
+            continue
     log_path = os.path.join(entry, log_name)
     if not os.path.exists(log_path):
         if opt_verbose: print('\tlog file not found')
@@ -95,5 +101,5 @@ else:
     print('Nothing to delete')
 for _, _, model_path in found:
     print('\t%s' %model_path)
-    if not opt_dry_run:
+    if not opt_dry_run and model_path is not None:
         os.unlink(model_path)
