@@ -103,6 +103,8 @@ elif found:
 else:
     print('Nothing to delete')
 for _, _, model_path in found:
+    if not model_path:
+        continue
     print('\t%s' %model_path)
-    if not opt_dry_run and model_path:
+    if not opt_dry_run:
         os.unlink(model_path)
