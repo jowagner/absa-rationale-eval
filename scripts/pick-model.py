@@ -58,7 +58,7 @@ for entry in os.listdir():
     if not os.path.exists(model_path):
         if opt_verbose: print('\tmodel file not found: previously deleted or not ready yet --> skipping folder')
         if opt_get_all_scores:
-            model_path = None
+            model_path = ''
         else:
             continue
     log_path = os.path.join(entry, log_name)
@@ -81,7 +81,7 @@ for entry in os.listdir():
             assert fields[6].startswith('device=')
             score = float(fields[5])
             if opt_verbose: print('\tdetected score', score)
-            if model_path is None:
+            if not model_path:
                 tie_breaker = 'zzz'  # place after all other entries
             else:
                 tie_breaker = hashlib.sha256(b'%d:%s:%s' %(
@@ -104,5 +104,5 @@ else:
     print('Nothing to delete')
 for _, _, model_path in found:
     print('\t%s' %model_path)
-    if not opt_dry_run and model_path is not None:
+    if not opt_dry_run and model_path:
         os.unlink(model_path)
