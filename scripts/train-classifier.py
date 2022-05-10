@@ -30,7 +30,7 @@ opt_lr1 = 10 / 1000000.0
 opt_lr2 = 30 / 1000000.0
 opt_frozen_epochs = 0
 opt_vbatchsize = 64
-opt_epochs = 25
+opt_epochs = 10
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
@@ -1143,7 +1143,7 @@ if not skip_training:
         max_epochs = max_epochs,
         min_epochs = classifier.hparams.nr_frozen_epochs + 2,
         gpus = classifier.hparams.gpus,
-        accumulate_grad_batches = accumulate_grad_batches,
+        accumulate_grad_batches = accumulate_grad_batches,  # 1 = no accumulation
         limit_train_batches     = limit_train_batches,
         check_val_every_n_epoch = 1,
         # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
