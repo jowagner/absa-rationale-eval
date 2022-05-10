@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# (C) 2022 Dublin City University
+# All rights reserved. This material may not be
+# reproduced, displayed, modified or distributed without the express prior
+# written permission of the copyright holder.
+
+# Author: Joachim Wagner
 
 import hashlib
 import os
