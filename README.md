@@ -21,9 +21,11 @@ subtask 1 data.
 ## Dependencies
 
 We develop this software with CUDA 11.1 + CUDNN, PyTorch 1.9.0,
-Hugging Face transformers and pytorch-lightning in Python 3.6.13.
-* `create-venv-pytorch.sh`: how the environment was set up
-* `pip-freeze-snapshot.txt`: all version numbers, including for indirect dependencies
+Hugging Face transformers 4.8.1 and pytorch-lightning 1.3.7.post0 in Python 3.6.15.
+Experiments have been caried out with CUDA 10.2 + CUDNN, PyTorch 1.9.0,
+Hugging Face transformers 4.9.1 and pytorch-lightning 1.4.1 in Python 3.7.3.
+* `create-venv-pytorch*.sh`: how the environment was set up
+* `pip-freeze-snapshot*.txt`: all version numbers, including for indirect dependencies
 
 
 ## Citation
