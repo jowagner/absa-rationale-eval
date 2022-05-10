@@ -60,7 +60,7 @@ for tr_task_short, tr_task_long, hours in [
 TR_TASK=%(tr_task_long)s
 TR_TASK_SHORT=%(tr_task_short)s
 SET=%(set_rank)d
-HPARAM=%(hparam)d
+HPARAM=''
 L=%(aio_name)s
 """ %locals())
             f.write("""
@@ -77,7 +77,8 @@ for RUN in 1 2 3 ; do
     date
     cd $PRJ_DIR
     MODEL_DIR_PREFIX=c-${TR_TASK_SHORT}-${SET}-${RUN}
-    MODEL_DIR=${MODEL_DIR_PREFIX}-${HPARAM}
+    #MODEL_DIR=${MODEL_DIR_PREFIX}-${HPARAM}
+    MODEL_DIR=${MODEL_DIR_PREFIX}
     mkdir $MODEL_DIR
     cd $MODEL_DIR
     mv best-model-weights-only.ckpt $(mktemp -u best-model-weights-only-XXXXXXXXXXXX.ckpt)
@@ -135,7 +136,7 @@ for RUN in 1 2 3 ; do
     date >> ${DESC}.end
     touch ${DESC}.end
     cd $PRJ_DIR
-    ./pick-model.py ${MODEL_DIR_PREFIX} ${DESC}
+    #./pick-model.py ${MODEL_DIR_PREFIX} ${DESC}
     date
     echo "done"
 done
