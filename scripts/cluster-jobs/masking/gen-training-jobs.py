@@ -12,26 +12,26 @@ import sys
 
 local_aio = True
 
-fhp = open('../../hparams.txt', 'rt')
-while True:
- line = fhp.readline()
- if not line:
-     break
- # print(seed, lr1, lr2, fre, vbs, neps[0])
- fields = line.split()
- hparam = int(fields[0])
- lr1 = int(fields[1])
- lr2 = int(fields[2])
- fre = int(fields[3])
- vbs = int(fields[4])
- nep = int(fields[5])
+#fhp = open('../../hparams.txt', 'rt')
+#while True:
+# line = fhp.readline()
+# if not line:
+#     break
+# # print(seed, lr1, lr2, fre, vbs, neps[0])
+# fields = line.split()
+hparam = 101  # int(fields[0])
+lr1 =     10  # int(fields[1])
+lr2 =     30  # int(fields[2])
+fre =      0  # int(fields[3])
+vbs =     64  # int(fields[4])
+nep =     10  # int(fields[5])
 
- for tr_task_short, tr_task_long, hours in [
+for tr_task_short, tr_task_long, hours in [
      ('f', 'Full',  int(1+3*0.05*nep)),
      ('s', 'SE',    int(1+3*0.05*nep)),
      ('o', 'Other', int(1+3*0.05*nep)),
      ('a', 'All',   int(1+3*0.15*nep)),
- ]:
+]:
   for aio_name, local_aio, save_as in [
      ('sea', False, 'best-sea.ckpt'),
      ('L25', True,  'best-L25.ckpt'),
@@ -123,11 +123,11 @@ for RUN in 1 2 3 ; do
 
             if local_aio:
                 f.write("""
-    ../scripts/train-classifier.py --aio-prefix $LAIODIR/ --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --aio-prefix $LAIODIR/ --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
             else:
                 f.write("""
-    ../scripts/train-classifier.py --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
 
             f.write("""
