@@ -1589,7 +1589,7 @@ for batch in get_batches_for_saliency(best_model):
         start_t = time.time()
         s = interpret(
             best_model, finalised_instance, labels,
-            variant = 'short line'
+            variant = 'integrated'
         )
         print('Spent %.1f seconds on obtaining saliency scores.' %(time.time() - start_t))
     else:
