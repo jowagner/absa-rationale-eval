@@ -326,9 +326,9 @@ def get_annotation(aio_filename):
     f.close()
 
 def check_alignment(text, tokens):
-    text1 = text.replace(' ', '')
+    text1 = text.replace('Cannot ', 'cannot ')  # match lowercase of tokeniser
+    text1 = text1.replace(' ', '')
     text1 = text1.replace('\xa0', '')   # also remove non-breakable space
-    text1 = text1.replace('Cannot ', 'cannot')  # match lowercase of tokeniser
     text2 = ''.join(tokens)
     text2 = text2.replace('-EMTCN01-', ':)')  # restore emoticon in SEA
     if text1 != text2:
