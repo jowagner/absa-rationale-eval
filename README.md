@@ -32,6 +32,20 @@ subtask 1 data.
 * `pip-freeze-snapshot*.txt`: all version numbers, including for indirect dependencies
 
 
+## Training Classifiers
+
+1. `scripts/cluster-jobs/masking/gen-training-jobs.py`
+2. Run `run-train-c-sea-[fson]-[1-3]1-to-[1-3]3.job` (12 jobs) to get "Full", "SE", "not SE" and "None" models
+3. Get avg and stddev of unmasked "Full" classifier for bottom of Table 1
+
+TBC:
+3. Get saliency maps: `scripts/cluster-jobs/saliency/gen-saliency-jobs.py`
+4. Produce Fig 1
+5. `extract-aio.sh`
+
+TODO: What is needed to create Fig 1?
+
+
 ## Citation
 
 Here we will provide details on the paper this software is first used in when it is accepted.
