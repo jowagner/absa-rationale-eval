@@ -108,6 +108,8 @@ elif training_task == 'Other':  # sequence B is all but the SE (the SE words are
     training_masks = ['I']
 elif training_task == 'All':    # concatenation of above training sets
     training_masks = [None, 'O', 'I']
+elif training_task == 'None':  # sequence B is masked
+    training_masks = ['*']
 else:
     raise ValueError('unknown training task %s' %training_task)
 
@@ -592,6 +594,7 @@ class ABSA_Dataset(Dataset):
         template_index = -1,    # -1 = pick random template
         mask = None,            # 'I' = mask SE tokens, i.e. use other tokens only,
                                 # 'O' = mask other tokens, i.e. use SE tokens only
+                                # '*' = mask all tokens, i.e. seq A and length only
         info = None,            # additional info to keep with each instance
     ):
         self.raw_data            = raw_data
@@ -662,7 +665,7 @@ class ABSA_Dataset(Dataset):
             return tokens
         retval = []
         for index, token in enumerate(tokens):
-            if sea[index] == self.mask:
+            if self.mask == '*' or sea[index] == self.mask:
                 retval.append('[MASK]')
             else:
                 retval.append(token)
@@ -718,7 +721,7 @@ print('Devset size (using all templates):', len(dev_dataset_combined))
 if skip_evaluation:
     test_masks = [None]
 else:
-    test_masks = (None, 'O', 'I')
+    test_masks = (None, 'O', 'I', '*')
 
 te_dataset_objects = []
 for mask in test_masks:
@@ -1262,6 +1265,7 @@ mask2seqb = {
     None: 'Full',
     'O':  'SE',
     'I':  'Other',
+    '*':  'None',
 }
 
 for te_index, te_dataset_object in enumerate(te_dataset_objects):
