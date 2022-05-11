@@ -43,8 +43,8 @@ for tr_task_short, tr_task_long, hours in [
      ('RND75', True, 'best-RND75.ckpt'),
   ]:
     for set_rank in (1,2,3):
-        with open('run-train-c-%s-%s-%d1-to-%d3-hp-%d.job' %(
-            aio_name, tr_task_short, set_rank, set_rank, hparam
+        with open('run-train-c-%s-%s-%d1-to-%d3.job' %(   #-hp-%d.job' %(
+            aio_name, tr_task_short, set_rank, set_rank #, hparam
         ), 'w') as f:
             f.write("""#!/bin/bash
 
