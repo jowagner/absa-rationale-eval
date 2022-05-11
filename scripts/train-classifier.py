@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# (C) 2021 Dublin City University
+# (C) 2021, 2022 Dublin City University
 # All rights reserved. This material may not be
 # reproduced, displayed, modified or distributed without the express prior
 # written permission of the copyright holder.
@@ -325,17 +325,16 @@ def get_annotation(aio_filename):
             sea.append(fields[1])
     f.close()
 
-def get_alignment(text, annotation):
-    tokens, sea = annotation
+def check_alignment(text, tokens):
     text1 = text.replace(' ', '')
     text1 = text1.replace('\xa0', '')   # also remove non-breakable space
+    text1 = text1.replace('Cannot ', 'cannot')  # match lowercase of tokeniser
     text2 = ''.join(tokens)
     text2 = text2.replace('-EMTCN01-', ':)')  # restore emoticon in SEA
     if text1 != text2:
         print('Mismatch %r - %r' %(text, tokens))
     #else:
     #    print('Match %r - %r' %(text, tokens))
-    return tokens, sea
 
 def absa_sort_key(sentence_xml_element):
     sent_id = sentence_xml_element.get('id')
@@ -367,7 +366,8 @@ def get_dataset(
         op_index = 0
         for opinion in sentence.iter('Opinion'):
             op_id = '%s:%d' %(sent_id, op_index)
-            tokens, sea = get_alignment(text, annotation.__next__())
+            tokens, sea = annotation.__next__()
+            check_alignment(text, tokens)
             opin_cat = opinion.get('category')
             #print('opin_cat', opin_cat)
             entity_type, attribute_label = opin_cat.split('#')
