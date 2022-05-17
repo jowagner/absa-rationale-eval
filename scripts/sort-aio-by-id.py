@@ -8,6 +8,9 @@
 
 # Author: Joachim Wagner
 
+# restore item order in .aio file augmented with review ID, sentence index
+# and opinion index provided in first input column
+
 import sys
 
 example = """
