@@ -10,6 +10,13 @@
 
 import sys
 
+include_domain_breakdown = False
+if len(sys.argv) > 1:
+    if len(sys.argv) == 2 and sys.argv[1] in ('--include-domain-breakdown', '--domains'):
+        include_domain_breakdown = True
+    else:
+        raise ValueError('unsupported option(s)')
+
 example = """
 ==> c-f-1-1/stdout-training-with-local-aio.txt <==
 
@@ -135,14 +142,18 @@ def get_cell_content(m_type, tr, domain, te):
     std_dev = (sum(sq_errors)/(n-1.5+1.0/(8.0*(n-1.0))))**0.5  # More accurate std dev
     return r'%.1f $\pm %.1f$' %(avg_score, std_dev)
 
+is_first = True
 for domain, maj_acc, baseline_acc in [
     ('Laptop',     60.0, get_cell_content('tab2-SE', 'tr=Full', 'Laptop', 'Full')),
     ('Restaurant', 71.1, get_cell_content('tab2-SE', 'tr=Full', 'Restaurant', 'Full')),
     ('Overall',    65.8, get_cell_content('tab2-SE', 'tr=Full', 'Overall', 'Full')),
 ]:
-    if domain != 'Laptop':
+    if not include_domain_breakdown and domain != 'Overall':
+        continue
+    if not is_first:
         f.write(r"""    \multicolumn{3}{l}{} \\
 """)
+    is_first = False
     f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
     \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
     \multicolumn{3}{l}{Unmasked (Full): %(baseline_acc)s} \\
@@ -220,14 +231,18 @@ for m_type, mask_filename, mask_title in [
     \hline
 """ %locals())
 
+    is_first = True
     for domain, maj_acc, in [
         ('Laptop',     60.0),
         ('Restaurant', 71.1),
         ('Overall',    65.8),
     ]:
-        if domain != 'Laptop':
+        if not include_domain_breakdown and domain != 'Overall':
+            continue
+        if not is_first:
             f.write(r"""    \multicolumn{3}{l}{} \\
 """)
+        is_first = False
         f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
     \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
     \hline
