@@ -36,22 +36,28 @@ subtask 1 data.
 
 Train basic classifers "Full", "None", "SE" and "not SE":
 1. `scripts/cluster-jobs/masking/gen-training-jobs.py`
-2. Run `run-train-c-sea-[fson]-[1-3]1-to-[1-3]3.job` (12 jobs, each training 3 classifiers)
+2. Submit `run-train-c-sea-[fson]-[1-3]1-to-[1-3]3.job` (12 jobs, each training 3 classifiers)
 
 First 2 rows of Table 1 (and some of the appendix tables) are ready:
  - Run `scripts/get-accuracies-for-masking-rationales.sh` and inspect output file `results-masking-diagonal.tex`
 
 Get saliency maps and detailed log files:
- - Run `scripts/cluster-jobs/saliency/gen-saliency-jobs.py`
+1. Run `scripts/cluster-jobs/saliency/gen-saliency-jobs.py`
+2. Submit `run-saliency-c-f-??.job` (9 jobs, CPU-only)
 
 Train R@ classifiers:
 1. Run `scripts/extract-aio.sh` to get `.aio` files for rationales with length .25, .50 and .75
-2. Run `run-train-c-L[257][05]-[so]-[1-3]1-to-[1-3]3.job` (18 jobs, each training 3 classifiers)
+2. Submit `run-train-c-L[257][05]-[so]-[1-3]1-to-[1-3]3.job` (18 jobs, each training 3 classifiers)
+
+Train U-SE and not-U-SE classifiers:
+ - Submit `run-train-c-union-[so]-[1-3]1-to-[1-3]3.job` (6 jobs, each training 3 classifiers; `.aio` files are created inside each job)
+ - The `s` and `o` jobs for the same set `11` to `33` must not start at the same time as they overwrite existing `.aio` files.
+
+Train A@ classifiers:
+ - Submit `run-train-c-RND[257][05]-[os]-?1-to-?3.job` (18 jobs, each training 3 classifiers, `.aio` files are created inside each job)
+ - The `s` and `o` jobs for the same set `11` to `33` must not start at the same time as they overwrite existing `.aio` files.
 
 TODO:
- - Train U-SE and not U-SE classifiers
- - get .aio files for random saliency maps, e.g. A50 should contain all tokens of A25
- - Train A@ classifiers
  - What is needed to create Fig 1?
 
 
