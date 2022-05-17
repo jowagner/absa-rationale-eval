@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: ascii -*-
 
-# (C) 2021 Dublin City University
+# (C) 2021, 2022 Dublin City University
 # All rights reserved. This material may not be
 # reproduced, displayed, modified or distributed without the express prior
 # written permission of the copyright holder.
@@ -27,6 +27,7 @@ Full     """
 
 trshort2sortkey = {
     'f': 'tr=Full',
+    'n': 'tr=None',
     's': 'tr=SE/R',
     'o': 'tr=Y_Other',
     'a': 'tr=Z_Concat',
@@ -50,7 +51,7 @@ while True:
         assert fields[0] == 'c'
         run = 3*(int(fields[2])-1) + int(fields[3])
         tr = trshort2sortkey[fields[1]]
-        if filename == 'stdout.txt':
+        if filename in ('stdout-training-with-sea-aio.txt', 'stdout.txt'):
             m_type = 'tab2-SE'
         elif 'with-union-aio' in filename:
             m_type = 'tab2-U-SE'
@@ -76,6 +77,8 @@ while True:
     elif 'Sun et al. QA-M' in line:
         if line.startswith('Full'):
             te = 'Full'
+        elif line.startswith('None'):
+            te = 'None'
         elif line.startswith('SE'):
             te = 'SE/R'
         elif line.startswith('Other'):
@@ -117,7 +120,9 @@ def get_cell_content(m_type, tr, domain, te):
         key = (m_type, tr, domain, te, run)
         if key in data:
             scores.append(data[key])
-    assert len(scores) == 9
+    if len(scores) != 9:
+        #raise ValueError('Expected 9 scores, got %r for m_type %r, tr %r, domain %r, te %r and run %r' %(scores, m_type, tr, domain, te, run))
+        return '--.-   -  -.- '
     avg_score = sum(scores)/float(len(scores))
     sq_errors = []
     for score in scores:
@@ -163,7 +168,8 @@ for domain, maj_acc, baseline_acc in [
         gap = (5 - len(mask_title)) * ' '
         f.write(r'    \textbf{%s}%s' %(mask_title, gap))
         for tr, te in [
-            #('tr=Full',    'Full'),
+            ('tr=Full',    'Full'),
+            ('tr=None',    'None'),
             ('tr=SE/R',    'SE/R'),
             ('tr=Y_Other', 'Z-CompSE/R'),
         ]:
@@ -205,9 +211,10 @@ for m_type, mask_filename, mask_title in [
 
 \begin{table}
     \centering
-    \begin{tabular}{l|rrr}
+    \begin{tabular}{l|rrrr}
     \textbf{Model} & \multicolumn{3}{c}{\textbf{Test Accuracy}} \\
                    & \textbf{Full}
+                   & \textbf{None}
                    & \textbf{%(mask_title)s}
                    & \textbf{$\neg$%(mask_title)s} \\
     \hline
@@ -220,14 +227,15 @@ for m_type, mask_filename, mask_title in [
     ]:
         if domain != 'Laptop':
             f.write(r"""    \multicolumn{3}{l}{} \\
-    """)
+""")
         f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
     \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
     \hline
-    """ %locals())
+""" %locals())
 
         for tr, tr_title in [
             ('tr=Full',    'Full'),
+            ('tr=None',    'None'),
             ('tr=SE/R',    mask_title),
             ('tr=Y_Other', '$\\neg$' + mask_title),
             ('tr=Z_Concat', 'Concat'),
@@ -238,6 +246,7 @@ for m_type, mask_filename, mask_title in [
             f.write(r'    \textbf{%s}%s' %(tr_title, gap))
             for te in [
                 'Full',
+                'None',
                 'SE/R',
                 'Z-CompSE/R',
             ]:
