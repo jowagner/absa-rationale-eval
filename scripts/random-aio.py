@@ -61,17 +61,24 @@ for tokens, sea, start_line in get_annotation(sys.stdin):
     if debug: sys.stdout.write('\nRead item %d from line %d: %r, %r\n' %(item_count, start_line, tokens, sea))
     n = len(tokens)
     se_length = int(n * relative_length + 0.5)  # rounding to nearest length
+    # assign randomised saliency scores (+ tie breaker)
+    scores = []
+    for index in range(n):
+        scores.append((random.random(), index))
+    # select lowest scoring tokens (interpreting the number as 1-probability)
+    # as rationale
+    scores.sort()
+    selected = map(lambda x: x[1], scores[:se_length])
+    # write aio format
     remaining_i_tags = se_length
     remaining_o_tags = n - se_length
-    for token in tokens:
+    for index, token in enumerate(tokens):
         assert remaining_i_tags + remaining_o_tags > 0
-        if not remaining_i_tags:
-            tag = 'O'
-        elif not remaining_o_tags:
-            tag = 'I'
-        elif random.randrange(remaining_i_tags + remaining_o_tags) < remaining_i_tags:
+        if index in selected:
+            assert remaining_i_tags > 0
             tag = 'I'
         else:
+            assert remaining_o_tags > 0
             tag = 'O'
         if debug: sys.stdout.write('%d\t%d\t' %(remaining_i_tags, remaining_o_tags))
         sys.stdout.write('%s\t%s\n' %(token, tag))
@@ -80,4 +87,6 @@ for tokens, sea, start_line in get_annotation(sys.stdin):
         else:
             remaining_o_tags -= 1
     sys.stdout.write('\n')
+    assert remaining_i_tags == 0
+    assert remaining_o_tags == 0
 if debug: sys.stdout.write('Done\n')
