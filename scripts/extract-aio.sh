@@ -15,7 +15,7 @@
 
 LOGNAME=saliency-morewio-xfw-stdout.txt
 
-for L in L20 L25 L33 L40 L50 L67 L75 ; do
+for L in L25 L50 L75 ; do
     for D in laptop restaurant ; do
         for I in c-f-?-? ; do
             echo $L $D $I

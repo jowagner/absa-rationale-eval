@@ -1541,12 +1541,8 @@ def print_example_rationales(rationale, raw_tokens, batch_item, sea):
     ''' print example rationales in I/O tag format '''
     length = len(rationale)
     for (iolabel, t_length) in [
-        ('L20', int(0.20*len(raw_tokens)+0.5)),
         ('L25', int(0.25*len(raw_tokens)+0.5)),
-        ('L33', int(0.33*len(raw_tokens)+0.5)),
-        ('L40', int(0.40*len(raw_tokens)+0.5)),
         ('L50', int(0.50*len(raw_tokens)+0.5)),
-        ('L67', int(0.67*len(raw_tokens)+0.5)),
         ('L75', int(0.75*len(raw_tokens)+0.5)),
     ]:
         if length == t_length:
