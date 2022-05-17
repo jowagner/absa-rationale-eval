@@ -116,8 +116,7 @@ f.write(r"""% Table with masking results, diagonal of results from Appendix
     \centering
     \begin{tabular}{l|rr}
     %\hline
-    \textbf{Target} & \multicolumn{2}{c}{\textbf{Training and Test Setting}} \\
-                   & \textbf{SE/R/A} & \textbf{$\neg$SE/$\neg$R/$\neg$A} \\
+    \textbf{Input} & \textbf{Accuracy} & \textbf{Input} & \textbf{Accuracy}  \\
     \hline
 """)
 
@@ -156,10 +155,14 @@ for domain, maj_acc, baseline_acc in [
     is_first = False
     f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
     \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
-    \multicolumn{3}{l}{Unmasked (Full): %(baseline_acc)s} \\
     \hline
 """ %locals())
-    for m_type, mask_title in [
+    f.write(r'    \textbf{Full}        & %s & \textbf{None}        & %s \\' %(
+        get_cell_content('tab2-SE', 'tr=Full', domain, 'Full'),
+        get_cell_content('tab2-SE', 'tr=None', domain, 'None'),
+    ))
+    f.write('\n')
+    for m_type, mask_title_left in [
         ('tab2-SE',   'SE'),
         ('tab2-U-SE', 'U-SE'),
         (None, None),            # = hline separator
@@ -172,18 +175,19 @@ for domain, maj_acc, baseline_acc in [
         ('tab4-RND75',  'A@.75'),
         (None, None),            # = hline separator
     ]:
+        f.write('    ')
         if not m_type:
-            f.write(r'    \hline')
+            f.write(r'\hline')
             f.write('\n')
             continue
-        gap = (5 - len(mask_title)) * ' '
-        f.write(r'    \textbf{%s}%s' %(mask_title, gap))
-        for tr, te in [
-            ('tr=Full',    'Full'),
-            ('tr=None',    'None'),
-            ('tr=SE/R',    'SE/R'),
-            ('tr=Y_Other', 'Z-CompSE/R'),
+        for is_first_column, tr, te, mask_title in [
+            (True,  'tr=SE/R',    'SE/R',       mask_title_left),
+            (False, 'tr=Y_Other', 'Z-CompSE/R', '$\\neg$' + mask_title_left),
         ]:
+            if not is_first_column:
+                f.write('& ')
+            gap = (12 - len(mask_title)) * ' '
+            f.write(r'\textbf{%s}%s' %(mask_title, gap))
             f.write(r'& %s ' %get_cell_content(m_type, tr, domain, te))
         f.write(r'\\')
         f.write('\n')
@@ -192,8 +196,12 @@ f.write(r"""    \end{tabular}
              and effect of restricting input to sentiment expressions (SE),
              the union of all SEs where a sentence has multiple opinions (U-SE),
              rationales (R), random tokens (A) and
-             masking all other tokens ($\neg$SE, $\neg$R, and $\neg$A)
-             for 25\%, 50\% and 75\% lengths.}
+             masking all other tokens ($\neg$SE, $\neg$R and $\neg$A)
+             for 25\%, 50\% and 75\% lengths.
+             ``None'' masks the review sentence completely. Only the
+             review domain, aspect entity type, aspect attribute and sentence
+             length (via the number of ``[MASK]'' tokens) are available to
+             the classifier in this setting.}
     \label{tab:masking:rationales-diagonal}
 \end{table}
 % eof
