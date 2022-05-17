@@ -34,16 +34,24 @@ subtask 1 data.
 
 ## Training Classifiers
 
+Train basic classifers "Full", "None", "SE" and "not SE":
 1. `scripts/cluster-jobs/masking/gen-training-jobs.py`
 2. Run `run-train-c-sea-[fson]-[1-3]1-to-[1-3]3.job` (12 jobs) to get "Full", "SE", "not SE" and "None" models
-3. Get avg and stddev of unmasked "Full" classifier for bottom of Table 1
 
-TBC:
-3. Get saliency maps: `scripts/cluster-jobs/saliency/gen-saliency-jobs.py`
-4. Produce Fig 1
-5. `extract-aio.sh`
+First 2 rows of Table 1 (and some of the appendix tables) are ready:
+3. Run `scripts/get-accuracies-for-masking-rationales.sh` and inspect output file `results-masking-diagonal.tex`
 
-TODO: What is needed to create Fig 1?
+Get saliency maps and detailed log files:
+4. Run `scripts/cluster-jobs/saliency/gen-saliency-jobs.py`
+
+
+TODO:
+ - Train U-SE and not U-SE classifiers
+ - `extract-aio.sh` to get .aio files for our rationales R@.25, R@.50 and R@.75 (L25, L50, L75 aio)
+ - Train R@ classifiers
+ - get .aio files for random saliency maps, e.g. A50 should contain all tokens of A25
+ - Train A@ classifiers
+ - What is needed to create Fig 1?
 
 
 ## Citation
