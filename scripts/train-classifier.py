@@ -712,7 +712,9 @@ for training_mask in dev_masks:
 
 dev_dataset_combined = torch.utils.data.ConcatDataset(dev_dataset_objects)
 
-print('Devset size (using all templates):', len(dev_dataset_combined))
+print('Devset size (using %d masks and %d templates): %d' %(
+    len(dev_masks), len(templates), len(dev_dataset_combined)
+))
 
 # 2.4 Test Data
 
@@ -738,7 +740,9 @@ for mask in test_masks:
 
 te_dataset_combined = torch.utils.data.ConcatDataset(te_dataset_objects)
 
-print('Test set size (using all templates):', len(te_dataset_combined))
+print('Test set size (using %d masks and %d templates): %d' %(
+    len(test_masks), len(templates), len(te_dataset_combined)
+))
 
 
 # 2.5 Lightning Wrapper for Training, Development and Test Data
@@ -1199,12 +1203,25 @@ if not skip_training:
         # (if saved with setting the 2nd arg to True, the checkpoint   # TODO: "False"?
         # will contain absoulte paths and training parameters)
     )
+    print('Best model saved as', opt_save_model_as)
+
+    print('Cleaning checkpoints:\n')
+    index = 0
+    for path in save_top_model_callback.best_k_models:
+        print(' [%d] %r...\n' %(index, path))
+        trainer.strategy.remove_checkpoint(path)
+        index += 1
+    save_top_model_callback.best_k_models       = {}
+    save_top_model_callback.current_score       = None
+    save_top_model_callback.kth_best_model_path = ''
+    save_top_model_callback.kth_value           = None
+    save_top_model_callback.best_model_path     = ''
+    save_top_model_callback.best_model_score    = None
+    save_top_model_callback.last_model_path     = ''
 
     # to just save the bert model in pytorch format and without the classification head, we follow
     # https://github.com/PyTorchLightning/pytorch-lightning/issues/3096#issuecomment-686877242
     #best_model.bert.save_pretrained('best-bert-encoder.pt')
-
-    # TODO: the above only saves the BERT encoder, not the classification head
 
     # Since the lightning module inherits from pytorch, we can save the full network in
     # pytorch format:
@@ -1276,7 +1293,9 @@ for te_index, te_dataset_object in enumerate(te_dataset_objects):
     row.append(mask2seqb[te_dataset_object.mask])
     row.append('%d' %template_index)
     question = templates[template_index]['question']
-    print('\nQuestion template %d: %r' %(te_index, question))
+    print('\nTest set %d: Mask %s, i.e. using %s, with question template %d, i.e. %r' %(
+        te_index, te_dataset_object.mask, row[0], template_index, question
+    ))
     score = 100.0 * test_and_print(te_dataset_object)
     row.append('%.9f' %score)
     if len(domains) > 1:
@@ -1301,11 +1320,8 @@ if skip_saliency:
 
 # 6.1 Copy of Test Data with Prediction as Label
 #
-#     We create datasets annotated with the predicted label so the
-#     gradient can be easily calculated for the predicted label
-#     instead of the gold label.
-
-# TODO
+# We update the label in prepare_batch_for_salience()
+# only when necesary further below.
 
 
 # 6.2 Get Input Gradient
