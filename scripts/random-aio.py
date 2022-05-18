@@ -11,20 +11,37 @@
 import random
 import sys
 
-debug = False
+def usage():
+    print('Usage: $0 [options] <RELATIVE-LENGTH> < input.aio > output.aio')
+    # TODO: print more details how to use this script
 
-if sys.argv[1] == '--seed':
-    seed = sys.argv[2]
-    del sys.argv[2]
+debug = False
+while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
+    option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
-    if seed != '0':   # 0 = use system default
-        import hashlib
-        if type(b'') is not str:
-            # Python 3
-            seed = seed.encode('UTF-8')
-        seed = int(hashlib.sha512(seed).hexdigest(), 16)  # convert string to int consistently across Python versions
-        if debug: sys.stdout.write('Seed hashed to %d\n' %seed)
-        random.seed(seed)
+    if option in ('-h', '--help'):
+        usage()
+        sys.exit(0)
+    elif option == '--debug':
+        debug = True
+    elif option in ('--seed', '--random-seed'):
+        seed = sys.argv[1]
+        del sys.argv[1]
+        if seed == '0':
+            # 0 = use system default
+            if debug: sys.stdout.write('PRNG not seeded\n')
+        else:
+            import hashlib
+            if type(b'') is not str:
+                # Python 3
+                seed = seed.encode('UTF-8')
+            seed = int(hashlib.sha512(seed).hexdigest(), 16)  # convert string to int consistently across Python versions
+            if debug: sys.stdout.write('Seed hashed to %d\n' %seed)
+            random.seed(seed)
+    else:
+        print('Unknown option', option)
+        usage()
+        sys.exit(1)
 
 relative_length = float(sys.argv[1])
 
@@ -61,14 +78,17 @@ for tokens, sea, start_line in get_annotation(sys.stdin):
     if debug: sys.stdout.write('\nRead item %d from line %d: %r, %r\n' %(item_count, start_line, tokens, sea))
     n = len(tokens)
     se_length = int(n * relative_length + 0.5)  # rounding to nearest length
+    if debug: sys.stdout.write('%d tokens, %d selected for SE\n' %(n, se_length))
     # assign randomised saliency scores (+ tie breaker)
     scores = []
     for index in range(n):
         scores.append((random.random(), index))
+    if debug: sys.stdout.write('Saliency map %r\n' %scores)
     # select lowest scoring tokens (interpreting the number as 1-probability)
     # as rationale
     scores.sort()
-    selected = map(lambda x: x[1], scores[:se_length])
+    selected = list(map(lambda x: x[1], scores[:se_length]))
+    if debug: sys.stdout.write('Selected indices %r\n' %selected)
     # write aio format
     remaining_i_tags = se_length
     remaining_o_tags = n - se_length
