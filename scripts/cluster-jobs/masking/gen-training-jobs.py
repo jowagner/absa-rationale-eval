@@ -92,31 +92,35 @@ for RUN in 1 2 3 ; do
             if local_aio:
                 f.write("""
     LAIODIR=local-aio-%(aio_name)s
-    mkdir $LAIODIR
-    hostname >> $LAIODIR/prep.start
-    date     >> $LAIODIR/prep.start
-    touch       $LAIODIR/prep.start
-    for D in laptop restaurant ; do
-        for T in train test ; do
+    if [ -e $LAIODIR ] ; then
+        echo "Re-using $LAIODIR"
+    else
+        mkdir $LAIODIR
+        hostname >> $LAIODIR/prep.start
+        date     >> $LAIODIR/prep.start
+        touch       $LAIODIR/prep.start
+        for D in laptop restaurant ; do
+            for T in train test ; do
 """ %locals())
                 if aio_name.startswith('L'):
                     f.write("""
-            cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio $LAIODIR/${T}.${D}.aio
+                cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio $LAIODIR/${T}.${D}.aio
 """ %locals())
                 elif aio_name == 'union':
                     f.write("""
-            ../scripts/union-aio.py < data/${T}.${D}.aio > $LAIODIR/${T}.${D}.aio
+                ../scripts/union-aio.py < data/${T}.${D}.aio > $LAIODIR/${T}.${D}.aio
 """ %locals())
                 elif aio_name.startswith('RND'):
                     rnd_p = float(aio_name[3:]) / 100.0
                     f.write("""
-            ../scripts/random-aio.py --seed ${SET}${RUN} %(rnd_p).9f < data/${T}.${D}.aio > $LAIODIR/${T}.${D}.aio
+                ../scripts/random-aio.py --seed ${SET}${RUN} %(rnd_p).9f < data/${T}.${D}.aio > $LAIODIR/${T}.${D}.aio
 """ %locals())
                 else:
                     raise ValueError('unknown aio_name %s' %aio_name)
                 f.write("""
+            done
         done
-    done
+    fi
 """ %locals())
 
             f.write("""
