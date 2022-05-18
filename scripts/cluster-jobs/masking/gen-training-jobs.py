@@ -81,14 +81,14 @@ for RUN in 1 2 3 ; do
     #MODEL_DIR=${MODEL_DIR_PREFIX}-${HPARAM}
     MODEL_DIR=${MODEL_DIR_PREFIX}
     mkdir $MODEL_DIR
+    cd $MODEL_DIR
     if [ -e %(save_as)s ] ; then
         echo "Found existing model -- skipping"
         continue
     fi
-    cd $MODEL_DIR
     mv best-model-weights-only.ckpt $(mktemp -u best-model-weights-only-XXXXXXXXXXXX.ckpt)
     ln -s ../data
-""")
+""" %locals())
             if local_aio:
                 f.write("""
     LAIODIR=local-aio-%(aio_name)s
