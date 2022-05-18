@@ -1205,11 +1205,11 @@ if not skip_training:
     )
     print('Best model saved as', opt_save_model_as)
 
-    print('Cleaning checkpoints:\n')
+    print('Cleaning checkpoints:')
     index = 0
     for path in save_top_model_callback.best_k_models:
-        print(' [%d] %r...\n' %(index, path))
-        trainer.strategy.remove_checkpoint(path)
+        print(' [%d] %r...' %(index, path))
+        os.unlink(path)  # TODO: couldn't find trainer.strategy.remove_checkpoint()
         index += 1
     save_top_model_callback.best_k_models       = {}
     save_top_model_callback.current_score       = None
