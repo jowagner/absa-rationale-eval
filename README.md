@@ -51,11 +51,12 @@ Train R@ classifiers:
 
 Train U-SE and not-U-SE classifiers:
  - Submit `run-train-c-union-[so]-[1-3]1-to-[1-3]3.job` (6 jobs, each training 3 classifiers; `.aio` files are created inside each job)
- - The `s` and `o` jobs for the same set `11` to `33` must not start at the same time as they overwrite existing `.aio` files.
 
 Train A@ classifiers:
  - Submit `run-train-c-RND[257][05]-[os]-?1-to-?3.job` (18 jobs, each training 3 classifiers, `.aio` files are created inside each job)
- - The `s` and `o` jobs for the same set `11` to `33` must not start at the same time as they overwrite existing `.aio` files.
+
+Training jobs not submitted above are only needed for results reported in the appendix of our paper.
+The `f' (Full) and `n' (None) classifiers should not vary across the different settings (sea, union, R25, etc.).
 
 TODO:
  - What is needed to create Fig 1?
