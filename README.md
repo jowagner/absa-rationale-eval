@@ -64,13 +64,15 @@ The `f' (Full) and `n' (None) classifiers should not vary across the different s
 
 ## Agreement with Sentiment Expressions
 
-TODO: What is needed to create Fig 1?
-`summary-table-to-graph-data.py`
+To produce Figure 1:
+1. Run `scripts/get-summary-tables.sh` to prepare `final-test-summary.txt` in each `c-f-?-?` folder
+2. Run `scripts/summary-table-to-graph-data.py` to produce 6 `.tsv` files
+3. Use spreadsheet application to create graph from `FL-inv-weighted-micro.tsv` (FL = F-score over length)
 
 
 ## Length Oracle
 
-1. Get rationales with gold length TODO: How?
+1. SE agreement statistics for rationales with gold length are included in the `saliency-morewio-xfw-stdout.txt` log files.
 2. `get-length-oracle-scores.sh`
 
 
