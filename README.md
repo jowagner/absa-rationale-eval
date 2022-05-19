@@ -55,6 +55,9 @@ Train U-SE and not-U-SE classifiers:
 Train A@ classifiers:
  - Submit `run-train-c-RND[257][05]-[os]-?1-to-?3.job` (18 jobs, each training 3 classifiers, `.aio` files are created inside each job)
 
+Generate Table 1 (appendix tables are also partially ready):
+ - Run `scripts/get-accuracies-for-masking-rationales.sh` and inspect output file `results-masking-diagonal.tex`
+
 Training jobs not submitted above are only needed for results reported in the appendix of our paper.
 The `f' (Full) and `n' (None) classifiers should not vary across the different settings (sea, union, R25, etc.).
 
