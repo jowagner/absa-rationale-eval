@@ -61,8 +61,43 @@ Generate Table 1 (appendix tables are also partially ready):
 Training jobs not submitted above are only needed for results reported in the appendix of our paper.
 The `f' (Full) and `n' (None) classifiers should not vary across the different settings (sea, union, R25, etc.).
 
-TODO:
- - What is needed to create Fig 1?
+
+## Agreement with Sentiment Expressions
+
+TODO: What is needed to create Fig 1?
+`summary-table-to-graph-data.py`
+
+
+## Length Oracle
+
+1. Get rationales with gold length TODO: How?
+2. `get-length-oracle-scores.sh`
+
+
+## Sentence Length Distribution
+
+`get-se-length-distribution.py`
+for Figure 2
+
+
+## Confusion Matrices
+
+`get-confusion-matrices.py`
+We used the output to find out that 3.1% of test instances can be predicted correctly
+as neutral by the SE models simply based on not the fact that these many test instances have zero SE tokens and
+are neutral.
+
+
+## Word Cloud
+
+`word-clouds.shword-clouds.sh`
+requires https://github.com/amueller/word_cloud that can be installed with
+`pip install wordcloud`
+
+
+## Get Examples with Sentiment Expressions and Rationales
+
+`get-examples.py`
 
 
 ## Citation
