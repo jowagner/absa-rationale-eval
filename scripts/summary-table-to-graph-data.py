@@ -24,6 +24,9 @@ From	To	tn	fp	fn	tp	Pr	Re	F	Acc	Avg-Pr	Avg-Re	Avg-F	Avg-Acc	IW-tn	IW-fp	IW-fn	IW
   """
 
 def get_int_x10(s):
+    ''' convert a number as string in %.1f format
+        to an integer with 1/10 resolution
+    '''
     parts = s.split('.')
     whole, fraction = parts
     assert len(fraction) == 1
