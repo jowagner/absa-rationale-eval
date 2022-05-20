@@ -9,7 +9,7 @@ if len(sys.argv) > 1 and sys.argv[1] == 'sevenpoints':
     options   = '--load-model-from best-sea.ckpt --gradient-method seven_points'
 elif len(sys.argv) > 1 and sys.argv[1] == 'shortline-test':
     outsuffix = 'shortline-test-xfw'
-    options   = '--load-model-from best-sea.ckpt --gradient-method seven_points --test-saliencies-only'
+    options   = '--load-model-from best-sea.ckpt --gradient-method short_line --test-saliencies-only'
 else:
     outsuffix = 'morewio-xfw'
     options   = '--load-model-from best-sea.ckpt'
