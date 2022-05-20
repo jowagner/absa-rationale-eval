@@ -1,7 +1,7 @@
 #!/bin/bash
   
 #SBATCH -p compute     # which partition to run on
-#SBATCH -J a-%(shortname)s%(part)d-24h    # name for the job
+#SBATCH -J s-%(shortname)s%(part)d-30h    # name for the job
 #SBATCH --mem=87000
 #SBATCH --exclusive
 #SBATCH --constraint=avx2

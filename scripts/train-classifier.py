@@ -31,6 +31,7 @@ opt_lr2 = 30 / 1000000.0
 opt_frozen_epochs = 0
 opt_vbatchsize = 64
 opt_epochs = 10
+opt_gradient_method = 'integrated'
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
@@ -56,6 +57,9 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         del sys.argv[1]
     elif option in ('--epochs'):
         opt_epochs = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--gradient', '--gradient-method'):
+        opt_gradient_method = sys.argv[1].replace('_', ' ')
         del sys.argv[1]
     elif option in ('--save-as', '--save-model', '--save-model-as'):
         opt_save_model_as = sys.argv[1]
@@ -1379,6 +1383,10 @@ def get_alphas(variant):
         return numpy.linspace(0, 1, num=25)
     elif variant == 'point':
         return [1]
+    elif variant == 'three points':
+        return numpy.linspace(0.98, 1.02, num=3)
+    elif variant == 'seven points':
+        return numpy.linspace(0.97, 1.03, num=7)
     elif variant == 'short line':
         return numpy.linspace(0.95, 1.05, num=15)
     else:
@@ -1605,7 +1613,7 @@ for batch in get_batches_for_saliency(best_model):
         start_t = time.time()
         s = interpret(
             best_model, finalised_instance, labels,
-            variant = 'integrated'
+            variant = opt_gradient_method
         )
         print('Spent %.1f seconds on obtaining saliency scores.' %(time.time() - start_t))
     else:

@@ -1,9 +1,15 @@
 #!/usr/bin/env python
 
+import sys
+
 template = open('template-saliency.job', 'r').read()
 
-outsuffix = 'morewio-xfw'
-options   = '--load-model-from best-sea.ckpt'
+if len(sys.argv) > 1 and sys.argv[1] == 'sevenpoints':
+    outsuffix = 'sevenpoints-xfw'
+    options   = '--load-model-from best-sea.ckpt --gradient-method seven_points'
+else:
+    outsuffix = 'morewio-xfw'
+    options   = '--load-model-from best-sea.ckpt'
 
 # speed-up when saliency scores are available from a previous run:
 # --saliencies-from saliency-tr-stdout.txt --saliencies-from saliency-stdout-wfw.txt'
