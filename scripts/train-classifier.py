@@ -32,12 +32,19 @@ opt_frozen_epochs = 0
 opt_vbatchsize = 64
 opt_epochs = 10
 opt_gradient_method = 'integrated'
+exclude_function_words = True    # only affects evaluation measures and confusion matrices
+get_training_saliencies = True   # also print saliencies for training data in addition to dev/test
+
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
     if option in ('-h', '--help'):
         usage()
         sys.exit(0)
+    elif option in ('--wfw', '--with-function-words'):
+        exclude_function_words = False
+    elif option in ('--test-saliencies-only', '--dev-and-test-saliencies-only'):
+        get_training_saliencies = False
     elif option == '--local-aio':
         aio_prefix = 'local-aio/'
     elif option == '--aio-prefix':
@@ -116,9 +123,6 @@ elif training_task == 'None':  # sequence B is masked
     training_masks = ['*']
 else:
     raise ValueError('unknown training task %s' %training_task)
-
-exclude_function_words = True    # only affects evaluation measures and confusion matrices
-get_training_saliencies = True   # also print saliencies for training data in addition to dev/test
 
 # 1.1 BERT Configuration
 

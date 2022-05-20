@@ -69,6 +69,10 @@ To produce Figure 1:
 2. Run `scripts/summary-table-to-graph-data.py` to produce 6 `.tsv` files
 3. Use spreadsheet application to create graph from `FL-inv-weighted-micro.tsv` (FL = F-score over length)
 
+For the above steps, saliency maps are only needed for test data.
+To try different saliency methods, `train-classifier.py` can be run
+with `--dev-and-test-saliencies-only`, speeding up the process about 4x.
+
 
 ## Length Oracle
 
