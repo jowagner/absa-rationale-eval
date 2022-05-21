@@ -61,6 +61,7 @@ Generate Table 1 (appendix tables are also partially ready):
 Training jobs not submitted above are only needed for results reported in the appendix of our paper.
 The `f' (Full) and `n' (None) classifiers should not vary across the different settings (sea, union, R25, etc.).
 
+It should be possible to train the U-SE and A@ classifiers in parallel with the first step but we did not test this.
 
 ## Agreement with Sentiment Expressions
 
@@ -96,9 +97,9 @@ are neutral.
 
 ## Word Cloud
 
-`word-clouds.shword-clouds.sh`
-requires https://github.com/amueller/word_cloud that can be installed with
-`pip install wordcloud`
+1. Check that the c-f-?-? folders contain `-wcloud.tsv` files for the desired setting. Modify and re-run `extract-aio.sh` as needed. Default is to produce word clouds for R@.5 only.
+2. Install https://github.com/amueller/word_cloud e.g. with `pip install wordcloud`
+3. Run `word-clouds.shword-clouds.sh`
 
 
 ## Get Examples with Sentiment Expressions and Rationales

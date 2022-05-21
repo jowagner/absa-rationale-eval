@@ -21,17 +21,17 @@ for L in L25 L50 L75 ; do
             echo $L $D $I
             grep -E "^"${L}"\s"${D}"\s(training|dev)\s" -A 1 $I/$LOGNAME \
                 | grep -v -E "^--$" \
+                | tee $I/train-${D}-${L}-wcloud.tsv \
                 | cut -f4,5,6 \
                 | scripts/sort-aio-by-id.py \
                 | cut -f2,3 > $I/train-${D}-${L}.aio
             grep -E "^"${L}"\s"${D}"\stest\s" -A 1 $I/$LOGNAME \
                 | grep -v -E "^--$" \
+                | tee $I/test-${D}-${L}-wcloud.tsv \
                 | cut -f4,5,6 \
                 | scripts/sort-aio-by-id.py \
                 | cut -f2,3 > $I/test-${D}-${L}.aio
+            # only keep wcloud.tsv for L50
+            rm -f $I/train-${D}-L?5-wcloud.tsv
 done ; done ; done
 
-#               | tee $I/train-${D}-${L}-step1.tmp \
-#               | tee $I/train-${D}-${L}-step2.tmp \
-#               | tee $I/test-${D}-${L}-step1.tmp \
-#               | tee $I/test-${D}-${L}-step2.tmp \
