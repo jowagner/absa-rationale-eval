@@ -1602,6 +1602,8 @@ def get_fscore(confusion):
         f = 0.0
     return f
 
+print('Gradient method:', opt_gradient_method, 'with alphas', get_alphas(opt_gradient_method))
+
 summaries = {}
 
 for batch in get_batches_for_saliency(best_model):
