@@ -117,10 +117,10 @@ elif training_task == 'SE':     # sequence B is only the sentiment expression, a
     training_masks = ['O']
 elif training_task == 'Other':  # sequence B is all but the SE (the SE words are masked)
     training_masks = ['I']
-elif training_task == 'All':    # concatenation of above training sets
-    training_masks = [None, 'O', 'I']
 elif training_task == 'None':  # sequence B is masked
     training_masks = ['*']
+elif training_task == 'All':    # concatenation of above training sets
+    training_masks = [None, 'O', 'I', '*']
 else:
     raise ValueError('unknown training task %s' %training_task)
 
