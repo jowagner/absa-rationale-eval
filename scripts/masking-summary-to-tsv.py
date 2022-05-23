@@ -263,8 +263,6 @@ for m_type, mask_filename, mask_title in [
             ('tr=Y_Other', '$\\neg$' + mask_title),
             ('tr=Z_Concat', 'Concat'),
         ]:
-            if mask_title.startswith('A@') and tr[3] in 'FZ':
-                continue
             gap = (11 - len(tr_title)) * ' '
             f.write(r'    \textbf{%s}%s' %(tr_title, gap))
             for te in [
