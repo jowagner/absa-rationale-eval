@@ -10,6 +10,8 @@
 
 import sys
 
+opt_show_stddev_in_appendix = False
+
 include_domain_breakdown = False
 if len(sys.argv) > 1:
     if len(sys.argv) == 2 and sys.argv[1] in ('--include-domain-breakdown', '--domains'):
@@ -120,7 +122,7 @@ f.write(r"""% Table with masking results, diagonal of results from Appendix
     \hline
 """)
 
-def get_cell_content(m_type, tr, domain, te):
+def get_cell_content(m_type, tr, domain, te, show_stddev = True):
     scores = []
     for run in range(1,10):
         key = (m_type, tr, domain, te, run)
@@ -130,6 +132,8 @@ def get_cell_content(m_type, tr, domain, te):
         #raise ValueError('Expected 9 scores, got %r for m_type %r, tr %r, domain %r, te %r and run %r' %(scores, m_type, tr, domain, te, run))
         return '--.-   -  -.- '
     avg_score = sum(scores)/float(len(scores))
+    if not show_stddev:
+        return '%.1f' %avg_score
     sq_errors = []
     for score in scores:
         error = avg_score - score
@@ -272,7 +276,10 @@ for m_type, mask_filename, mask_title in [
                 'Z-CompSE/R',
             ]:
                 try:
-                    f.write('& %s ' %get_cell_content(m_type, tr, domain, te))
+                    f.write('& %s ' %get_cell_content(
+                        m_type, tr, domain, te,
+                        show_stddev = opt_show_stddev_in_appendix
+                    ))
                 except ValueError:
                     f.write('& -- ')
             f.write(r'\\')
