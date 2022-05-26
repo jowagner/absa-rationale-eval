@@ -256,7 +256,7 @@ for m_type, mask_filename, mask_title in [
 """)
         is_first = False
         f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
-    \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
+    %%\multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
     \hline
 """ %locals())
 
