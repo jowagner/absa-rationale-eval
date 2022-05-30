@@ -1,0 +1,35 @@
+#!/bin/bash
+
+#SBATCH -p compute     # which partition to run on
+#SBATCH -J mv-spin    # name for the job
+#SBATCH --mem=2000
+#SBATCH --constraint=faststorage
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks=1
+#SBATCH -N 1-1
+
+SDIR=$HOME/sentiment/absa-rationale-eval
+TDIR=/spinning/$USER/sentiment/absa-rationale-eval
+
+cd $SDIR
+for CDIR in c-?-?-? ; do
+    echo == $CDIR ==
+    cd $CDIR
+    mkdir -p $TDIR/$CDIR
+    for F in *.ckpt ; do
+        if [ -f $F ] ; then
+            if [ -h $F ] ; then
+                echo ignoring symliunk $F
+            else
+                # $F is a file or directory
+                rsync -avP $F $TDIR/$CDIR/
+                mkdir -p old
+                sleep 2
+                mv $F old/
+                sleep 2
+                ln -s $TDIR/$CDIR/$F
+            fi
+        fi
+    done
+    cd ..
+done
