@@ -11,6 +11,8 @@
 import sys
 
 opt_show_stddev_in_appendix = False
+opt_number_of_sets = 4
+opt_runs_per_set = 3
 
 include_domain_breakdown = False
 if len(sys.argv) > 1:
@@ -18,6 +20,8 @@ if len(sys.argv) > 1:
         include_domain_breakdown = True
     else:
         raise ValueError('unsupported option(s)')
+
+expected_total_runs = opt_number_of_sets * opt_runs_per_set
 
 example = """
 ==> c-f-1-1/stdout-training-with-local-aio.txt <==
@@ -58,7 +62,9 @@ while True:
         fields = folder.split('-')
         assert len(fields) == 4
         assert fields[0] == 'c'
-        run = 3*(int(fields[2])-1) + int(fields[3])
+        set_index = int(fields[2])-1
+        run_in_set_index = int(fields[3])
+        run = opt_runs_per_set * set_index + run_in_set_index
         tr = trshort2sortkey[fields[1]]
         if filename in ('stdout-training-with-sea-aio.txt', 'stdout.txt'):
             m_type = 'tab2-SE'
@@ -123,12 +129,13 @@ f.write(r"""% Table with masking results, diagonal of results from Appendix
 """)
 
 def get_cell_content(m_type, tr, domain, te, show_stddev = True):
+    global expected_total_runs
     scores = []
-    for run in range(1,10):
+    for run in range(1, expected_total_runs+1):
         key = (m_type, tr, domain, te, run)
         if key in data:
             scores.append(data[key])
-    if len(scores) != 9:
+    if len(scores) != expected_total_runs:
         #raise ValueError('Expected 9 scores, got %r for m_type %r, tr %r, domain %r, te %r and run %r' %(scores, m_type, tr, domain, te, run))
         return '--.-   -  -.- '
     avg_score = sum(scores)/float(len(scores))
