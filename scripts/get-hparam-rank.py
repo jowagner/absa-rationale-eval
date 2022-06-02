@@ -20,6 +20,7 @@ def usage():
 opt_seed = b'101'
 opt_verbose = False
 opt_data_dir = 'hyper-parameter-search'
+opt_epochs = None
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
     option = sys.argv[1].replace('_', '-')
     del sys.argv[1]
@@ -28,6 +29,9 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
         sys.exit(0)
     elif option == '--data-dir':
         opt_data_dir = sys.argv[1]
+        del sys.argv[1]
+    elif option == '--epochs':
+        opt_epochs = int(sys.argv[1])
         del sys.argv[1]
     elif option == '--seed':
         opt_seed = sys.argv[1].encode('utf-8')
@@ -46,7 +50,18 @@ model_name = 'training-with-sea-aio'
 log_name = 'stdout-%s.txt' %model_name
 ckpt_name = 'best-%s.ckpt' %(model_name[14:-4])
 
+hparam2epochs = {}
+for hparam in '7 11 13 14 23 29 35 40 52 54'.split():
+    hparam2epochs[int(hparam)] = 30
+for hparam in '1 2 9 12 18 21 26 32 33 38 42 43 48 50'.split():
+    hparam2epochs[int(hparam)] = 20
+for hparam in range(55):
+    if not hparam in hparam2epochs:
+        hparam2epochs[hparam] = 10
+
 key2ranks = {}
+total = 0.0
+count = 0
 for run in '1-1 1-2 1-3 2-1 2-2 2-3 3-1 3-2 3-3'.split():
     for what in 'fso':
         model_dir_prefix = 'c-' + what + '-' + run
@@ -61,6 +76,9 @@ for run in '1-1 1-2 1-3 2-1 2-2 2-3 3-1 3-2 3-3'.split():
                 if opt_verbose: print('\tlog file not found')
                 continue
             hparam = int(entry.split('-')[-1])
+            if opt_epochs and opt_epochs != hparam2epochs[hparam]:
+                if opt_verbose: print('\tnumber of epochs not selected')
+                continue
             f = open(log_path, 'rt')
             while True:
                 line = f.readline()
@@ -93,6 +111,10 @@ for run in '1-1 1-2 1-3 2-1 2-2 2-3 3-1 3-2 3-3'.split():
             #key2ranks[key].append((rank, nscore, tie_breaker, model_path))
             key2ranks[key].append(rank)
             rank += 1.0
+            if opt_verbose:
+                # also get average score
+                total -= nscore
+                count += 1
 
 for hparam in range(1,55):
     row = []
@@ -100,7 +122,10 @@ for hparam in range(1,55):
     ranks = []
     for what in 'fso':
         key = (what, hparam)
-        avg_rank = sum(key2ranks[key]) / float(len(key2ranks[key]))
+        try:
+            avg_rank = sum(key2ranks[key]) / float(len(key2ranks[key]))
+        except KeyError:
+            avg_rank = 0.0
         ranks.append((avg_rank, what))
     ranks.sort()
     row.append('%.1f' %(ranks[0][0]))
@@ -108,3 +133,6 @@ for hparam in range(1,55):
     row.append('%s' %(ranks[0][1]))
     row.append('%s' %(ranks[-1][1]))
     print('\t'.join(row))
+
+if opt_verbose:
+    print('average score', 100.0*total / float(count))
