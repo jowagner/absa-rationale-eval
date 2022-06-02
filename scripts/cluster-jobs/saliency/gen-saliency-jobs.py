@@ -23,7 +23,7 @@ for shortname, longname in [
     #('o', 'Other'),
     #('a', 'All'),
 ]:
-    for part in (1,2,3):
+    for part in (1,2,3,4):
       for run in (1,2,3):
         f = open('run-saliency-c-%(shortname)s-%(part)d%(run)d.job' %locals(), 'w')
         f.write(template %locals())

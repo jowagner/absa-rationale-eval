@@ -27,11 +27,11 @@ vbs =     64  # int(fields[4])
 nep =     10  # int(fields[5])
 
 for tr_task_short, tr_task_long, hours in [
-     ('f', 'Full',  int(1+3*0.05*nep)),
-     ('s', 'SE',    int(1+3*0.05*nep)),
-     ('o', 'Other', int(1+3*0.05*nep)),
-     ('n', 'None',  int(1+3*0.05*nep)),
-     ('a', 'All',   int(1+3*0.15*nep)),
+     ('f', 'Full',  int(1+3*0.067*nep)),
+     ('s', 'SE',    int(1+3*0.067*nep)),
+     ('o', 'Other', int(1+3*0.067*nep)),
+     ('n', 'None',  int(1+3*0.067*nep)),
+     ('a', 'All',   int(1+12*0.067*nep)),
 ]:
   for aio_name, local_aio, save_as in [
      ('sea', False, 'best-sea.ckpt'),
@@ -43,7 +43,7 @@ for tr_task_short, tr_task_long, hours in [
      ('RND50', True, 'best-RND50.ckpt'),
      ('RND75', True, 'best-RND75.ckpt'),
   ]:
-    for set_rank in (1,2,3):
+    for set_rank in (1,2,3,4):
         with open('run-train-c-%s-%s-%d1-to-%d3.job' %(   #-hp-%d.job' %(
             aio_name, tr_task_short, set_rank, set_rank #, hparam
         ), 'w') as f:
