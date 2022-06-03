@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# (C) 2021 Dublin City University
+# (C) 2021, 2022 Dublin City University
 # All rights reserved. This material may not be
 # reproduced, displayed, modified or distributed without the express prior
 # written permission of the copyright holder.
@@ -16,19 +16,19 @@ import sys
 import time
 
 def usage():
-    print('Usage: $0')
+    print('Usage: $0 [options]')
     # shows dataset stats when run
 
 # 1.2 Dataset Configuration
 
 domains = ['laptop', 'restaurant']
 
-default_data_prefix = 'data/'
+data_prefix = 'data/'
 
 def get_filenames(aio_prefix = None):
-    global default_data_prefix
+    global data_prefix
     if aio_prefix is None:
-        aio_prefix = default_data_prefix
+        aio_prefix = data_prefix
     return {
         'laptop':     ((data_prefix + 'ABSA16_Laptops_Train_SB1_v2.xml',
                         aio_prefix  + 'train.laptop.aio'
@@ -37,7 +37,7 @@ def get_filenames(aio_prefix = None):
                         aio_prefix  + 'test.laptop.aio'
                        )
                       ),
-    
+
         'restaurant': ((data_prefix + 'ABSA16_Restaurants_Train_SB1_v2.xml',
                         aio_prefix  + 'train.restaurant.aio'
                        ),
@@ -52,7 +52,6 @@ def print_filenames(filenames):
         for part in (0,1):
             for filename in filenames[domain][part]:
                 print('Using', filename)
-
 
 # 2.1 Get Data Instances from XML and AIO Files
 
@@ -79,9 +78,9 @@ def get_annotation(aio_filename):
             sea.append(fields[1])
     f.close()
 
-def get_alignment(text, annotation):
-    tokens, sea = annotation
-    text1 = text.replace(' ', '')
+def check_alignment(text, tokens):
+    text1 = text.replace('Cannot ', 'cannot ')  # match lowercase of tokeniser
+    text1 = text1.replace(' ', '')
     text1 = text1.replace('\xa0', '')   # also remove non-breakable space
     text2 = ''.join(tokens)
     text2 = text2.replace('-EMTCN01-', ':)')  # restore emoticon in SEA
@@ -89,7 +88,6 @@ def get_alignment(text, annotation):
         print('Mismatch %r - %r' %(text, tokens))
     #else:
     #    print('Match %r - %r' %(text, tokens))
-    return tokens, sea
 
 def absa_sort_key(sentence_xml_element):
     sent_id = sentence_xml_element.get('id')
@@ -102,7 +100,7 @@ def absa_sort_key(sentence_xml_element):
 
 from xml.etree import ElementTree
 
-def get_dataset(
+def get_dataset_from_filepair(
     xml_filename, aio_filename, domain,
     observed_entity_types, observed_attribute_labels,
     observed_polarities,   observed_targets
@@ -121,7 +119,8 @@ def get_dataset(
         op_index = 0
         for opinion in sentence.iter('Opinion'):
             op_id = '%s:%d' %(sent_id, op_index)
-            tokens, sea = get_alignment(text, annotation.__next__())
+            tokens, sea = annotation.__next__()
+            check_alignment(text, tokens)
             opin_cat = opinion.get('category')
             #print('opin_cat', opin_cat)
             entity_type, attribute_label = opin_cat.split('#')
@@ -152,30 +151,23 @@ def get_dataset(
         #print()
     return dataset
 
-
 def get_dataset(filenames, data_index = 0):
-    observed_entity_types = set()
-    observed_attribute_labels = set()
-    observed_polarities = set()
-    observed_targets = set()
+    entity_types = set()
+    attribute_labels = set()
+    polarities = set()
+    targets = set()
     dataset = []
     for domain in filenames:
         xml_filename = filenames[domain][data_index][0]
         aio_filename = filenames[domain][data_index][1]
-        dataset += get_dataset(
+        dataset += get_dataset_from_filepair(
             xml_filename, aio_filename, domain,
-            observed_entity_types, observed_attribute_labels,
-            observed_polarities,   observed_targets
+            entity_types, attribute_labels,
+            polarities,   targets
         )
-    return dataset, 
-           observed_entity_types, observed_attribute_labels,
-           observed_polarities,   observed_targets
+    return dataset, entity_types, attribute_labels, polarities, targets
 
 def main():
-    seed = 101
-    torch.manual_seed(seed)
-    random.seed(seed)
-    np.random.seed(seed)
     aio_prefix = None
     while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         option = sys.argv[1].replace('_', '-')
@@ -193,9 +185,10 @@ def main():
             usage()
             sys.exit(1)
     filenames = get_filenames(aio_prefix)
+    print_filenames(filenames)
     for dataset_index, dataset_name in enumerate(['trainig', 'test']):
         print('Dataset:', dataset_name)
-        dataset, _, _, _, _ = get_dataset(filnames, dataset_index)
+        dataset, _, _, _, _ = get_dataset(filenames, dataset_index)
         print('\tlength:', len(dataset))
 
 if __name__ == "__main__":
