@@ -10,14 +10,23 @@
 
 # based on https://marcotcr.github.io/lime/tutorials/Lime%20-%20multiclass.html
 
+import hashlib
 import lime
 import numpy as np
+import os
 import sys
+import time
 
 import raw_data
 
 max_n_features = int(sys.argv[1])
 dataset_index  = int(sys.argv[2])
+prob_dir = 'tasks/probs'
+task_dir = 'tasks'
+
+num_samples = 10000
+
+# TODO: command line options to set above variables
 
 # Fetching data, training a classifier
 
@@ -45,9 +54,31 @@ explainer = LimeTextExplainer(
     random_state     = 101,
 )
 
-# Previously, we used the default parameter for label when generating explanation, which works well in the binary case.
 # For the multiclass case, we have to determine for which labels we will get explanations, via the 'labels' parameter.
-# Below, we generate explanations for labels 0 and 17.
+# Below, we generate explanations for labels 0, 1 and 2.
+
+def get_package_name(items):
+    h = hashlib.sha256()
+    for item in items:
+        h.update(('%d:%s\n' %(len(item), ' '.join(item))).encode('UTF-8'))
+    return '%d-%s' %(len(items), h.hexdigest())
+      
+def get_probs(name):
+    n_items = int(name.split('-')[0])
+    retval = np.zeros(shape = (n_items, 3), dtype = np.float64)
+    f = open(prob_dir + '/' + name, 'rt')
+    for row_index in range(n_items):
+        fields = f.readline().split()
+        assert len(fields) == 3
+        for col_index in (0,1,2):
+            retval[row_index, col_index] = float(fields[col_index])
+    f.close()
+    return retval
+
+def write_package(package, name):
+    f = open(task_dir + '/' + name + '.new', 'wt')
+    raise NotImplementedError
+    f.close()
 
 def my_predict_proba(items):
     ''' input: list of d strings
@@ -56,9 +87,48 @@ def my_predict_proba(items):
     '''
     print('call of predict_proba() with batch size', len(items))
     assert type(items[0]) == str
-    raise NotImplementedError
+    # write task files
+    n_packages = 0
+    found = []
+    missing = []
+    while items:
+        if len(items) > 2097152:
+            pick = 1048576
+        elif len(items) > 1048576:
+            pick = int(len(items) // 2)
+        else:
+            pick = len(items)
+        n_packages += 1
+        package = items[:pick]
+        items = items[pick:]
+        name = get_package_name(package)
+        # TODO: should we test for pre-existing task file?
+        if os.path.exists(prob_dir + '/' + name):
+            found.append((n_packages, get_probs(name)))
+        else:
+            write_package(package, name)
+            missing.append((n_packages, name))
+    # collect answers
+    step = 0
+    next_wait = 0.25
+    while missing:
+        m_index = step % len(missing)
+        package_rank, name = missing[m_index]
+        if os.path.exists(prob_dir + '/' + name):
+            found.append((package_rank, get_probs(name)))
+            del missing[m_index]
+            next_wait = 0.25
+        time.sleep(next_wait)
+        next_wait = min(15.0, 2.0 * next_wait)
+        step += 1
+    # combine answers
+    found.sort()
+    parts = lambda x: x[1], found
+    return np.concatenate(parts, axis = 0)
+         
     # TODO: Can we return one-hot vectors or does LIME not work well for
     #       over-confident classifiers?
+    #       https://github.com/marcotcr/lime/issues/615 suggests probabilities are much preferred.
 
 for item_index, item in enumerate(dataset):
     domain, opinion_id, text, \
@@ -80,6 +150,9 @@ for item_index, item in enumerate(dataset):
     print('polarity', polarity)
     print()
 
+    # TODO: Seed LIME before every instance so that changing num_samples does not prohibit
+    #       re-use of predictions.
+
     assert '/' not in entity_type
     assert '/' not in attribute_label
     tokens.append('%s/%s/%s' %(domain, entity_type, attribute_label))
@@ -88,7 +161,7 @@ for item_index, item in enumerate(dataset):
         text_instance   = ' '.join(tokens),  # raw text (before my_tokeniser())
         classifier_fn   = my_predict_proba,
         num_features    = max_n_features,
-        num_samples     = 10000,
+        num_samples     = num_samples,
         labels          = [0,1,2],
     )
 
