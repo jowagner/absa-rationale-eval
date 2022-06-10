@@ -57,16 +57,22 @@ explainer = LimeTextExplainer(
 # For the multiclass case, we have to determine for which labels we will get explanations, via the 'labels' parameter.
 # Below, we generate explanations for labels 0, 1 and 2.
 
+item_info = None   # global variable as LIME does not provide a way to pass along item information
+item_index = None
+
 def get_package_name(items):
+    global item_info
     h = hashlib.sha256()
+    h.update(item_info.encode('UTF-8') + b'\n')
     for item in items:
         h.update(('%d:%s\n' %(len(item), ' '.join(item))).encode('UTF-8'))
     return '%d-%s' %(len(items), h.hexdigest())
-      
-def get_probs(name):
+
+def get_probs(prob_path):
+    name = prob_path.split('/')[-1]
     n_items = int(name.split('-')[0])
     retval = np.zeros(shape = (n_items, 3), dtype = np.float64)
-    f = open(prob_dir + '/' + name, 'rt')
+    f = open(prob_path, 'rt')
     for row_index in range(n_items):
         fields = f.readline().split()
         assert len(fields) == 3
@@ -76,8 +82,18 @@ def get_probs(name):
     return retval
 
 def write_package(package, name):
+    global item_info
+    global dataset_index
+    global item_index
+    item_task_dir = '%s/%d/%d' %(task_dir, dataset_index, item_index)
+    if not os.path.exists(task_dir):
+        os.makedirs(task_dir)
     f = open(task_dir + '/' + name + '.new', 'wt')
-    raise NotImplementedError
+    for item in package:
+        assert '\n' not in item
+        f.write('%d\t%d\t%s\t' %(dataset_index, item_index, item_info))
+        f.write(item)
+        f.write('\n')
     f.close()
 
 def my_predict_proba(items):
@@ -87,6 +103,11 @@ def my_predict_proba(items):
     '''
     print('call of predict_proba() with batch size', len(items))
     assert type(items[0]) == str
+    # TODO: check for masks already tried for this item
+    #       (package-level caching implemented so far does
+    #       not work with LIME as changing the set size
+    #       completely changes the order of permutations)
+
     # write task files
     n_packages = 0
     found = []
@@ -103,19 +124,20 @@ def my_predict_proba(items):
         items = items[pick:]
         name = get_package_name(package)
         # TODO: should we test for pre-existing task file?
-        if os.path.exists(prob_dir + '/' + name):
-            found.append((n_packages, get_probs(name)))
+        prob_path = '%s/%d/%d/%s' %(prob_dir, dataset_index, item_index, name)
+        if os.path.exists(prob_path):
+            found.append((n_packages, get_probs(prob_path)))
         else:
             write_package(package, name)
-            missing.append((n_packages, name))
+            missing.append((n_packages, prob_path))
     # collect answers
     step = 0
     next_wait = 0.25
     while missing:
         m_index = step % len(missing)
-        package_rank, name = missing[m_index]
-        if os.path.exists(prob_dir + '/' + name):
-            found.append((package_rank, get_probs(name)))
+        package_rank, prob_path = missing[m_index]
+        if os.path.exists(prob_path):
+            found.append((package_rank, get_probs(prob_path)))
             del missing[m_index]
             next_wait = 0.25
         time.sleep(next_wait)
@@ -125,7 +147,7 @@ def my_predict_proba(items):
     found.sort()
     parts = lambda x: x[1], found
     return np.concatenate(parts, axis = 0)
-         
+
     # TODO: Can we return one-hot vectors or does LIME not work well for
     #       over-confident classifiers?
     #       https://github.com/marcotcr/lime/issues/615 suggests probabilities are much preferred.
@@ -152,10 +174,12 @@ for item_index, item in enumerate(dataset):
 
     # TODO: Seed LIME before every instance so that changing num_samples does not prohibit
     #       re-use of predictions.
+    #       Actually, increasing num_samples seems to completely change the permutations.
+    #       The first previous_num_samples items are not the same.
 
-    assert '/' not in entity_type
-    assert '/' not in attribute_label
-    tokens.append('%s/%s/%s' %(domain, entity_type, attribute_label))
+    assert '\t' not in entity_type
+    assert '\t' not in attribute_label
+    item_info = '%s\t%s\t%s' %(domain, entity_type, attribute_label)  # hack to pass info around LIME
 
     exp = explainer.explain_instance(
         text_instance   = ' '.join(tokens),  # raw text (before my_tokeniser())
@@ -172,7 +196,7 @@ for item_index, item in enumerate(dataset):
         for item in items[:10]:
             print(item)
         print()
-    
+
     tokens = newsgroups_test.data[idx].split()
     for index, centre in enumerate(tokens):
         scores = []
