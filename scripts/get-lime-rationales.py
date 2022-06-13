@@ -19,8 +19,16 @@ import time
 
 import raw_data
 
-max_n_features = int(sys.argv[1])
-dataset_index  = int(sys.argv[2])
+max_n_features = 9999 # int(sys.argv[1])
+dataset_index  = int(sys.argv[1])   # 0 = training set, 1 = test set
+
+preload_tasks = False
+if len(sys.argv[2]) > 2:
+    if sys.argv[2] == 'preload':
+        preload_tasks = True
+    else:
+        raise ValueError('unknown command')
+
 prob_dir = 'tasks/probs'
 task_dir = 'tasks'
 
@@ -120,6 +128,7 @@ def get_missing_predictions(items):
         output: dictionary mapping each mask to its probability
                 triplet
     '''
+    global preload_tasks
     print('call of get_missing_predictions() with batch size', len(items))
     if not items:
         return {}
@@ -149,6 +158,8 @@ def get_missing_predictions(items):
             # normal case: task file needs to be written
             write_package(package, name)
         missing.append(prob_path)
+    if preload_tasks:
+        return None
     print('Waiting for predictions for %d package(s)...\n' %len(missing))
     # collect answers
     retval = {}
@@ -211,6 +222,10 @@ def my_predict_proba(items):
             triplet = mask2triplet[mask]
         except KeyError:
             triplet = cache[mask]
+        except TypeError:
+            if not preload_tasks:
+                raise TypeError
+            continue
         for col_index in range(3):
             retval[row_index, col_index] = triplet[col_index]
     return retval
