@@ -64,54 +64,67 @@ def get_package_name(items):
     global item_info
     h = hashlib.sha256()
     h.update(item_info.encode('UTF-8') + b'\n')
-    for item in items:
+    for item, mask in items:
         h.update(('%d:%s\n' %(len(item), ' '.join(item))).encode('UTF-8'))
     return '%d-%s' %(len(items), h.hexdigest())
 
-def get_probs(prob_path):
+def add_probs(mask2triplet, prob_path):
     name = prob_path.split('/')[-1]
     n_items = int(name.split('-')[0])
-    retval = np.zeros(shape = (n_items, 3), dtype = np.float64)
     f = open(prob_path, 'rt')
     for row_index in range(n_items):
         fields = f.readline().split()
-        assert len(fields) == 3
-        for col_index in (0,1,2):
-            retval[row_index, col_index] = float(fields[col_index])
+        assert len(fields) == 4
+        mask = int(fields[0])
+        triplet = []
+        for col_index in (1,2,3):
+            triplet.append(float(fields[col_index]))
+        mask2triplet[mask] = triplet
+    if f.readline():
+        print('Warning: trailing line(s) in', prob_path)
     f.close()
+    return mask2triplet
+
+def get_cache():
+    global prob_dir
+    global item_info
+    global dataset_index
+    global item_index
+    item_dir = '%s/%d/%d' %(prob_dir, dataset_index, item_index)
+    retval = {}
+    for entry in os.listdir(item_dir):
+        candidate_path = os.path.join(item_dir, entry)
+        if '-' in entry and os.path.isfile(candidate_path):
+            add_probs(retval, candidate_path)
     return retval
 
 def write_package(package, name):
     global item_info
     global dataset_index
     global item_index
-    item_task_dir = '%s/%d/%d' %(task_dir, dataset_index, item_index)
     if not os.path.exists(task_dir):
         os.makedirs(task_dir)
     f = open(task_dir + '/' + name + '.new', 'wt')
-    for item in package:
+    for item, mask in package:
         assert '\n' not in item
-        f.write('%d\t%d\t%s\t' %(dataset_index, item_index, item_info))
+        f.write('%d\t%d\t%s\t%d\t' %(dataset_index, item_index, item_info, mask))
         f.write(item)
         f.write('\n')
     f.close()
 
-def my_predict_proba(items):
-    ''' input: list of d strings
-        output: a (d, k) numpy array with probabilities of k classes
-                (classifier.predict_proba for ScikitClassifiers)
+def get_missing_predictions(items):
+    ''' input: list of (item, mask) pairs
+        output: dictionary mapping each mask to its probability
+                triplet
     '''
-    print('call of predict_proba() with batch size', len(items))
-    assert type(items[0]) == str
-    # TODO: check for masks already tried for this item
-    #       (package-level caching implemented so far does
-    #       not work with LIME as changing the set size
-    #       completely changes the order of permutations)
-
+    print('call of get_missing_predictions() with batch size', len(items))
+    if not items:
+        return {}
+    assert type(items[0]) is tuple
+    assert len(items[0]) == 2
     # write task files
-    n_packages = 0
-    found = []
     missing = []
+    concurrent = False
     while items:
         if len(items) > 2097152:
             pick = 1048576
@@ -119,34 +132,75 @@ def my_predict_proba(items):
             pick = int(len(items) // 2)
         else:
             pick = len(items)
-        n_packages += 1
         package = items[:pick]
         items = items[pick:]
         name = get_package_name(package)
-        # TODO: should we test for pre-existing task file?
         prob_path = '%s/%d/%d/%s' %(prob_dir, dataset_index, item_index, name)
-        if os.path.exists(prob_path):
-            found.append((n_packages, get_probs(prob_path)))
+        if os.path.exists(task_dir + '/' + name + '.new'):
+            print('Warning: detected concurrent run in same folder (1)\n')
+            concurrent = True
+        elif os.path.exists(prob_path):
+            print('Warning: detected concurrent run in same folder (2)\n')
+            concurrent = True
         else:
+            # normal case: task file needs to be written
             write_package(package, name)
-            missing.append((n_packages, prob_path))
+        missing.append(prob_path)
+    print('Waiting for predictions for %d package(s)...\n' %len(missing))
     # collect answers
+    retval = {}
     step = 0
     next_wait = 0.25
     while missing:
         m_index = step % len(missing)
-        package_rank, prob_path = missing[m_index]
+        prob_path = missing[m_index]
         if os.path.exists(prob_path):
-            found.append((package_rank, get_probs(prob_path)))
+            if concurrent:
+                # increase chances the file is complete
+                time.sleep(2.0)
+            # get_probs(prob_path)))
+            add_probs(retval, prob_path)
             del missing[m_index]
             next_wait = 0.25
-        time.sleep(next_wait)
+        if missing:
+            time.sleep(next_wait)
         next_wait = min(15.0, 2.0 * next_wait)
         step += 1
-    # combine answers
-    found.sort()
-    parts = lambda x: x[1], found
-    return np.concatenate(parts, axis = 0)
+    return retval
+
+def my_predict_proba(items):
+    ''' input: list of d strings
+        output: a (d, 3) numpy array with probabilities for
+                negative, neutral and positive
+    '''
+    print('call of predict_proba() with batch size', len(items))
+    assert type(items[0]) == str
+    # deduplicate and find cached items
+    # (for short sequences, LIME asks for predictions for the
+    # same input over and over again; furthermore, caching speeds
+    # up repeat runs, e.g. increasing the number of samples)
+    row2mask = []
+    cache = get_cache()
+    masks = set()
+    new = []
+    for item in items:
+        mask = get_mask(item)
+        row2mask.append(mask)
+        if mask not in masks and mask not in cache:
+            new.append((item, mask))
+            masks.add(mask)
+    # get missing predictions
+    mask2triplet = get_missing_predictions(new)
+    # assemble probability triplets
+    retval = np.zeros(shape = (len(items), 3), dtype = np.float64)
+    for row_index, mask in enumerate(row2mask):
+        try:
+            triplet = mask2triplet[mask]
+        except KeyError:
+            triplet = cache[mask]
+        for col_index in range(3):
+            retval[row_index, col_index] = triplet[col_index]
+    return retval
 
     # TODO: Can we return one-hot vectors or does LIME not work well for
     #       over-confident classifiers?
