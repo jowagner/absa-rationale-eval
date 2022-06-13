@@ -25,6 +25,7 @@ prob_dir = 'tasks/probs'
 task_dir = 'tasks'
 
 num_samples = 10000
+mask_string = '[MASK]'
 
 # TODO: command line options to set above variables
 
@@ -50,7 +51,7 @@ explainer = LimeTextExplainer(
     class_names      = class_names,
     split_expression = my_tokeniser,
     bow              = False,
-    mask_string      = '[MASK]',
+    mask_string      = mask_string,
     random_state     = 101,
 )
 
@@ -92,6 +93,8 @@ def get_cache():
     global item_index
     item_dir = '%s/%d/%d' %(prob_dir, dataset_index, item_index)
     retval = {}
+    if not os.path.exists(item_dir):
+        return retval
     for entry in os.listdir(item_dir):
         candidate_path = os.path.join(item_dir, entry)
         if '-' in entry and os.path.isfile(candidate_path):
@@ -167,6 +170,16 @@ def get_missing_predictions(items):
         next_wait = min(15.0, 2.0 * next_wait)
         step += 1
     return retval
+
+def get_mask(sentence):
+    global mask_string
+    tokens = my_tokeniser(sentence)
+    mask = 0
+    for token in tokens:
+        mask <<= 1
+        if token == mask_string:
+            mask = mask + 1
+    return mask
 
 def my_predict_proba(items):
     ''' input: list of d strings
