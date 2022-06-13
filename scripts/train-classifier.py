@@ -9,6 +9,7 @@
 # Author: Joachim Wagner
 
 import hashlib
+import math
 import numpy as np
 import os
 import random
@@ -34,6 +35,8 @@ opt_epochs = 10
 opt_gradient_method = 'integrated'
 exclude_function_words = True    # only affects evaluation measures and confusion matrices
 get_training_saliencies = True   # also print saliencies for training data in addition to dev/test
+opt_task_dir = 'tasks'           # where to find task files in predit mode
+prediction_speed = 30.3          # for deciding whether task can finish before deadline
 
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
@@ -94,6 +97,7 @@ torch.manual_seed(seed)
 random.seed(seed)
 np.random.seed(seed)
 
+opt_predict = False
 command = sys.argv[2]
 if command == 'train':
     skip_training = False
@@ -107,6 +111,13 @@ elif command == 'saliency':
     skip_training = True
     skip_evaluation = True
     skip_saliency = False
+elif command == 'predict':
+    skip_training = True
+    skip_evaluation = True
+    skip_saliency = True
+    opt_predict = True
+    deadline = time.time() + 3600.0 * float(sys.argv[3])
+    sys.argv[3] = 'Full'
 else:
     raise ValueError('unknown command %s' %command)
 
@@ -201,6 +212,8 @@ filenames = {
 }
 
 for domain in domains:
+    if opt_predict:
+        continue  # not loading dataset as data comes from task files
     for part in (0,1):
         for filename in filenames[domain][part]:
             print('Using', filename)
@@ -408,6 +421,55 @@ def get_dataset(
         #print()
     return dataset
 
+def get_task_data(
+    task_path, task_name,
+    observed_entity_types, observed_attribute_labels
+):
+    dataset = []
+    ds_idx, item_idx = None, None
+    f = open(task_path, 'rt')
+    while True:
+        line = f.readline()
+        if not line:
+            break
+        fields = line.rstrip().split('\t')
+        if ds_idx is None:
+            ds_idx = fields[0]
+            item_idx = fields[1]
+        else:
+            ds_idx == fields[0]
+            item_idx == fields[1]
+        domain = fields[2]
+        op_id  = '%s:%s:%s:%s' %(ds_idx, item_idx, task_name, fields[5])
+        text   = fields[6]
+        tokens = text.split()
+        entity_type = fields[3]
+        attribute_label = fields[4]
+        # add to dataset
+        dataset.append((
+            domain,
+            op_id, text, tokens, None,
+            entity_type, attribute_label,
+            None, None,
+            'UNK'
+        ))
+        # update vocabularies
+        observed_entity_types.add(entity_type)
+        observed_attribute_labels.add(attribute_label)
+    f.close()
+    return dataset
+
+def get_duration_estimate(task_path):
+    f = open(task_path, 'rt')
+    line_count = 0
+    while True:
+        line = f.readline()
+        if not line:
+            break
+        line_count += 1
+    f.close()
+    return line_count / prediction_speed
+
 # get training data
 
 tr_observed_entity_types = set()
@@ -417,6 +479,8 @@ tr_observed_targets = set()
 
 tr_dataset = []
 for domain in domains:
+    if opt_predict:
+        continue  # not using data sets (reading from task files instead)
     xml_filename = filenames[domain][0][0]
     aio_filename = filenames[domain][0][1]
     tr_dataset += get_dataset(
@@ -431,6 +495,11 @@ print('\nobserved attribute labels:', sorted(tr_observed_attribute_labels))
 print('\nobserved polarities:',       sorted(tr_observed_polarities))
 print('\nnumber of unique targets:',  len(tr_observed_targets))
 
+if opt_predict:
+   for label in 'negative neutral positive'.split():
+       tr_observed_polarities.add(label)
+       print('added label for prediction:', label)
+
 # get test data
 
 te_observed_entity_types = set()
@@ -440,6 +509,8 @@ te_observed_targets = set()
 
 te_dataset = []
 for domain in domains:
+    if opt_predict:
+        continue  # not using data sets (reading from task files instead)
     xml_filename = filenames[domain][1][0]
     aio_filename = filenames[domain][1][1]
     te_dataset += get_dataset(
@@ -447,6 +518,44 @@ for domain in domains:
         te_observed_entity_types, te_observed_attribute_labels,
         te_observed_polarities,   te_observed_targets
     )
+
+if opt_predict:
+    worker_id = []
+    try:
+        worker_id.append(os.environ['SLURM_TASK_PID'])
+    except KeyError:
+        worker_id.append('%d' %os.getpid())
+    try:
+        worker_id.append(os.environ['SLURM_JOB_NODELIST'])
+    except KeyError:
+        worker_id.append(os.uname()[1])
+    worker_id = '-'.join(worker_id)
+    print('worder ID:', worker_id)
+    eta = time.time()
+    my_tasks = []
+    for entry in os.listdir(opt_task_dir):
+        if not entry.endswith('.new'):
+            continue
+        task_path = os.path.join(opt_task_dir, entry)
+        duration = get_duration_estimate(task_path)
+        if eta + duration >= deadline:
+            # task does not fit in before the deadline
+            continue
+        # found an eligible task
+        try:
+            new_task_path = task_path[:-3] + worker_id
+            os.rename(task_path, new_task_path)
+        except:
+            print('could not claim task', entry)
+            continue
+        # add data
+        task_name = entry[:-4]
+        te_dataset += get_task_data(
+            new_task_path, task_name,
+            te_observed_entity_types, te_observed_attribute_labels,
+        )
+        my_tasks.append(new_task_path)
+        eta += duration
 
 print('dataset size:', len(te_dataset))
 print('\nnew observed entity types:',     sorted(te_observed_entity_types - tr_observed_entity_types))
@@ -610,6 +719,7 @@ class ABSA_Dataset(Dataset):
         self.template_index      = template_index
         self.mask                = mask
         self.info                = info
+        print('created new ABSA_Dataset with %d items' %len(self.raw_data))
 
     def __len__(self):
         return len(self.raw_data)
@@ -629,7 +739,7 @@ class ABSA_Dataset(Dataset):
             entity_type, attribute_label, domain, polarity,
         )
         tokens = self.apply_mask(tokens, sea)
-        # TODO: support adding context (previous sentences) to text
+        # wishlist: support adding context (previous sentences) to text
         retval = {}
         if self.put_question_first:
             retval['seq_A'] = question
@@ -728,7 +838,7 @@ print('Devset size (using %d masks and %d templates): %d' %(
 
 # create a separate test set for each question template
 
-if skip_evaluation:
+if skip_evaluation or opt_predict:
     test_masks = [None]
 else:
     test_masks = (None, 'O', 'I', '*')
@@ -904,7 +1014,7 @@ class Classifier(pl.LightningModule):
             logits = torch.Tensor.cpu(model_out["logits"]).numpy()
             predicted_labels = [
                 self.data.label_encoder.index_to_token[prediction]
-                for prediction in numpy.argmax(logits, axis=1)
+                for prediction in np.argmax(logits, axis=1)
             ]
             sample["predicted_label"] = predicted_labels[0]
         return sample
@@ -924,6 +1034,8 @@ class Classifier(pl.LightningModule):
 
     def reset_recorded_predictions(self):
         self.seq2label = {}
+        self.op_id2pred = {}
+        self.logits_batches = []
 
     def forward(self, batch_input):
         tokens  = batch_input['input_ids']
@@ -937,16 +1049,7 @@ class Classifier(pl.LightningModule):
         # get predictions for a test set:
         if self.record_predictions:
             logits_np = torch.Tensor.cpu(logits).numpy()
-            predicted_labels = [
-                self.data.label_encoder.index_to_token[prediction]
-                for prediction in numpy.argmax(logits_np, axis=1)
-            ]
-            for index, input_token_ids in enumerate(tokens):
-                key = torch.Tensor.cpu(input_token_ids).numpy().tolist()
-                # truncate trailing zeros
-                while key and key[-1] == 0:
-                    del key[-1]
-                self.seq2label[tuple(key)] = predicted_labels[index]
+            self.logits_batches.append(logits_np)
         return {"logits": logits}
 
     def loss(self, predictions: dict, targets: dict) -> torch.tensor:
@@ -1280,7 +1383,7 @@ header = []
 header.append('SeqB')
 header.append('Q')
 header.append('Overall')
-if len(domains) > 1:
+if len(domains) > 1 and not opt_predict:
     for domain in sorted(list(domains)):
         header.append(domain.title())
 header.append('Description')
@@ -1296,6 +1399,9 @@ mask2seqb = {
 for te_index, te_dataset_object in enumerate(te_dataset_objects):
     if skip_evaluation:
         break
+    if len(te_dataset_objects) <= 0:
+        print('Skipping empty dataset object')
+        continue
     template_index = te_index % len(templates)
     row = []
     row.append(mask2seqb[te_dataset_object.mask])
@@ -1306,7 +1412,7 @@ for te_index, te_dataset_object in enumerate(te_dataset_objects):
     ))
     score = 100.0 * test_and_print(te_dataset_object)
     row.append('%.9f' %score)
-    if len(domains) > 1:
+    if len(domains) > 1 and not opt_predict:
         print('\nBreakdown by domain:')
         for domain in sorted(list(domains)):
             print(domain)
@@ -1320,6 +1426,83 @@ for te_index, te_dataset_object in enumerate(te_dataset_objects):
 if not skip_evaluation:
     print('\nSummary:')
     print('\n'.join(summary))
+
+def get_predictions(te_dataset_object):
+    best_model.reset_recorded_predictions()
+    best_model.start_recording_predictions()
+    test_and_print(te_dataset_object)
+    best_model.stop_recording_predictions()
+    op_id2triplet = {}
+    next_idx_1 = 0
+    next_idx_2 = 0
+    for item in te_dataset_object:
+        op_id = item['opinion_id']
+        while True:
+            batch = best_model.logits_batches[next_idx_1]
+            if next_idx_2 < len(batch):
+                break
+            next_idx_1 += 1
+            next_idx_2 = 0
+        assert op_id not in op_id2triplet
+        op_id2triplet[op_id] = (
+            batch[next_idx_2, 0],
+            batch[next_idx_2, 1],
+            batch[next_idx_2, 2],
+        )
+        next_idx_2 += 1
+    return op_id2triplet
+
+if opt_predict:
+    start_time = time.time()
+    assert len(te_dataset_objects) == 1
+    te_dataset_object = te_dataset_objects[0]
+    assert len(te_dataset_object) > 0
+    assert len(templates) == 1
+    template_index = 0
+    question = templates[template_index]['question']
+    print('\nTest set with Mask %s, i.e. using %s, with question template %d, i.e. %r' %(
+        te_dataset_object.mask,
+        mask2seqb[te_dataset_object.mask],
+        template_index, question
+    ))
+    predictions = get_predictions(te_dataset_object)
+    # organise predictions by output file
+    file2row = {}
+    for op_id in predictions:
+        fields = op_id.split(':')
+        assert len(fields) == 4
+        file_id = tuple(fields[:3])
+        if file_id not in file2row:
+            file2row[file_id] = []
+        tag = fields[3]
+        pred = predictions[op_id]
+        file2row[file_id].append((tag, pred))
+    # write file(s) with predictions
+    for file_id in file2row:
+        assert len(file_id) == 3
+        pred_dir = os.path.join(opt_task_dir, 'probs', file_id[0], file_id[1])
+        if not os.path.exists(pred_dir):
+            os.makedirs(pred_dir)
+        pred_path = os.path.join(pred_dir, file_id[2])
+        f = open(pred_path, 'wt')
+        for tag, pred in file2row[file_id]:
+            probs = list(map(lambda x: math.exp(x), pred))
+            probs.sort()
+            total = sum(probs)
+            f.write('%s\t%.9f\t%.9f\t%.9f\n' %(
+                tag,
+                math.exp(pred[0]) / total,
+                math.exp(pred[1]) / total,
+                math.exp(pred[2]) / total,
+            ))
+        f.close()
+    for path in my_tasks:
+        os.unlink(path)
+    duration = time.time() - start_time
+    n = len(te_dataset_object)
+    print('%.1f seconds for %d predictions: speed = %.3f predictions per second' %(
+         duration, n, n / duration
+    ))
 
 if skip_saliency:
     sys.exit(0)
@@ -1366,8 +1549,6 @@ best_model.unfreeze_encoder()   # otherwise gradients will not arrive at embeddi
 
 # next step is then at 3:12:38 to add a forward hook and calculate the saliencies
 
-import numpy
-
 def dot_and_normalise(gradients, forward_embeddings):
     # https://discuss.pytorch.org/t/how-to-do-elementwise-multiplication-of-two-vectors/13182
     products = gradients * forward_embeddings
@@ -1384,15 +1565,15 @@ def dot_and_normalise(gradients, forward_embeddings):
 
 def get_alphas(variant):
     if variant == 'integrated':
-        return numpy.linspace(0, 1, num=25)
+        return np.linspace(0, 1, num=25)
     elif variant == 'point':
         return [1]
     elif variant == 'three points':
-        return numpy.linspace(0.98, 1.02, num=3)
+        return np.linspace(0.98, 1.02, num=3)
     elif variant == 'seven points':
-        return numpy.linspace(0.97, 1.03, num=7)
+        return np.linspace(0.97, 1.03, num=7)
     elif variant == 'short line':
-        return numpy.linspace(0.95, 1.05, num=15)
+        return np.linspace(0.95, 1.05, num=15)
     else:
         raise ValueError('gradient-based saliency maps with %s not implemented' %variant)
 
@@ -1472,7 +1653,7 @@ def prepare_batch_for_salience(batch, model):
         logits = torch.Tensor.cpu(model_out["logits"]).numpy()
         predictions = [
             model.data.label_encoder.index_to_token[prediction]
-            for prediction in numpy.argmax(logits, axis=1)
+            for prediction in np.argmax(logits, axis=1)
         ]
     # (2) update labels without changing gold label
     #     (if label is different, make a copy of the dictionary
