@@ -258,13 +258,12 @@ for item_index, item in enumerate(dataset):
 
     print()
     for class_index in range(3):
-        print ('Explanation for class [%d] = %s' %(class_index, ng_class_names[class_index]))
+        print ('Explanation for class [%d] = %s' %(class_index, class_names[class_index]))
         items = list(map(str, exp.as_list(label=class_index)))
         for item in items[:10]:
             print(item)
         print()
 
-    tokens = newsgroups_test.data[idx].split()
     for index, centre in enumerate(tokens):
         scores = []
         for class_index in range(3):
