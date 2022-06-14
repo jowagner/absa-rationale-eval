@@ -43,6 +43,7 @@ prediction_speed = 30.3          # for deciding whether task can finish before d
 prediction_memory = 3600.0       # bytes per item
 max_memory = 64480 * 1024.0 ** 2
 base_memory = 2400 * 1024.0 ** 2
+min_task_age = 20.0              # seconds
 
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
@@ -552,12 +553,18 @@ if opt_predict:
     eta = time.time()
     emem = base_memory
     my_tasks = []
+    tasks_rejected_due_to_age = 0
     tasks_rejected_due_to_deadline = 0
     tasks_rejected_due_to_memory = 0
     for entry in os.listdir(opt_task_dir):
         if not entry.endswith('.new'):
             continue
         task_path = os.path.join(opt_task_dir, entry)
+        age = time.time() - os.path.getmtime(task_path)
+        if age < min_task_age:
+            # task is too new (probably still being written to)
+            tasks_rejected_due_to_age += 1
+            continue
         duration, memory = get_duration_and_memory_estimate(task_path)
         if eta + duration >= deadline:
             # task does not fit in before the deadline
@@ -583,6 +590,8 @@ if opt_predict:
         my_tasks.append(new_task_path)
         eta += duration
         emem += memory
+    if tasks_rejected_due_to_age:
+        print(tasks_rejected_due_to_age, 'task(s) rejected due to age')
     if tasks_rejected_due_to_deadline:
         print(tasks_rejected_due_to_deadline, 'task(s) rejected due to deadline')
     if tasks_rejected_due_to_memory:
