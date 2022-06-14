@@ -20,23 +20,48 @@ import time
 
 import raw_data
 
-max_n_features = 9999 # int(sys.argv[1])
-dataset_index  = int(sys.argv[1])   # 0 = training set, 1 = test set
+def usage():
+    print('Usage: $0 [options] [preload]>')
+    # TODO: print more details how to use this script
 
+max_n_features = 9999
+dataset_index  = 0  # 0 = training set, 1 = test set
+max_tasks = None
 preload_tasks = False
-if len(sys.argv[2]) > 2:
-    if sys.argv[2] == 'preload':
-        preload_tasks = True
-    else:
-        raise ValueError('unknown command')
-
 prob_dir = 'tasks/probs'
 task_dir = 'tasks'
-
 num_samples = 10000
 mask_string = '[MASK]'
+opt_verbose = False
 
-# TODO: command line options to set above variables
+while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
+    option = sys.argv[1].replace('_', '-')
+    del sys.argv[1]
+    if option in ('-h', '--help'):
+        usage()
+        sys.exit(0)
+    elif option == '--verbose':
+        opt_verbose = True
+    elif option in ('--train', '--for-training-set'):
+        dataset_index = 0
+    elif option in ('--test', '--for-test-set'):
+        dataset_index = 1
+    elif option in ('--preload', '--do-not-wait-for-predictions'):
+        preload_tasks = True
+    elif option in ('--tasks', '--max-tasks'):
+        max_tasks = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--samples', '--num-samples'):
+        num_samples = int(sys.argv[1])
+        del sys.argv[1]
+    # TODO: add more options
+    else:
+        print('Unknown option', option)
+        usage()
+        sys.exit(1)
+
+if preload_tasks and max_tasks is None:
+    max_tasks = 100
 
 # Fetching data, training a classifier
 
@@ -114,15 +139,48 @@ def write_package(package, name):
     global item_info
     global dataset_index
     global item_index
+    global max_tasks
+    if max_tasks is not None:
+        if max_tasks == 0:
+            print('reached maximum number of tasks')
+            sys.exit(0)
     if not os.path.exists(task_dir):
         os.makedirs(task_dir)
-    f = bz2.open(task_dir + '/' + name + '.new', 'wt')
+    path_final = task_dir + '/' + name + '.new'
+    path_partial = path_final + '.part'
+    f = bz2.open(path_partial, 'wt')
     for item, mask in package:
         assert '\n' not in item
         f.write('%d\t%d\t%s\t%d\t' %(dataset_index, item_index, item_info, mask))
         f.write(item)
         f.write('\n')
     f.close()
+    os.rename(path_partial, path_final)
+    if max_tasks is not None:
+        max_tasks -= 1
+
+def is_in_preparation(dataset_index, item_index, name, verbose = False):
+    if os.path.exists(task_dir):
+        found_task = False
+        for entry in os.listdir(task_dir):
+            if entry.startswith(name):
+                # .new / .new.part / .$PID-$HOSTNAME suffix
+                found_task = True
+                break
+        if found_task:
+            if verbose: print('Warning: detected concurrent %s for %s in task folder' %(entry, name))
+            return True
+    prob_item_dir = '%s/%d/%d' %(prob_dir, dataset_index, item_index)
+    if os.path.exists(prob_item_dir):
+        found_probs = False
+        for entry in os.listdir(prob_item_dir):
+            if entry.startswith(name):
+                # '' / .part suffix
+                found_probs = True
+        if found_probs:
+            if verbose: print('Warning: detected concurrent %s for %s in prediction folder %s' %(entry, name, prob_item_dir))
+            return True
+    return False
 
 def get_missing_predictions(items):
     ''' input: list of (item, mask) pairs
@@ -149,11 +207,7 @@ def get_missing_predictions(items):
         items = items[pick:]
         name = get_package_name(package)
         prob_path = '%s/%d/%d/%s' %(prob_dir, dataset_index, item_index, name)
-        if os.path.exists(task_dir + '/' + name + '.new'):
-            print('Warning: detected concurrent run in same folder (1)\n')
-            concurrent = True
-        elif os.path.exists(prob_path):
-            print('Warning: detected concurrent run in same folder (2)\n')
+        if is_in_preparation(dataset_index, item_index, name, verbose = True):
             concurrent = True
         else:
             # normal case: task file needs to be written
@@ -198,7 +252,9 @@ def my_predict_proba(items):
         output: a (d, 3) numpy array with probabilities for
                 negative, neutral and positive
     '''
-    print('call of predict_proba() with batch size', len(items))
+    total = len(items)
+    print('call of predict_proba() with %d item(s)' %total)
+    assert total > 0
     assert type(items[0]) == str
     # deduplicate and find cached items
     # (for short sequences, LIME asks for predictions for the
@@ -208,12 +264,23 @@ def my_predict_proba(items):
     cache = get_cache()
     masks = set()
     new = []
+    after_dedup = 0
+    cache_miss = 0
     for item in items:
         mask = get_mask(item)
         row2mask.append(mask)
-        if mask not in masks and mask not in cache:
-            new.append((item, mask))
-            masks.add(mask)
+        if mask not in masks:
+            after_dedup += 1
+            if mask not in cache:
+                cache_miss += 1
+                new.append((item, mask))
+                masks.add(mask)
+    print('%d item(s) after deduplication' %after_dedup)
+    print('%d unique items (%.1f%% raw, %.1f%% dedup) not in cache' %(
+        cache_miss,
+        100.0*cache_miss/float(total),
+        100.0*cache_miss/float(after_dedup),
+    ))
     # get missing predictions
     mask2triplet = get_missing_predictions(new)
     # assemble probability triplets
@@ -273,7 +340,11 @@ for item_index, item in enumerate(dataset):
     )
 
     print()
-    for class_index in range(3):
+    if opt_verbose:
+        expl_for_classes = range(3)
+    else:
+        expl_for_classes = []
+    for class_index in expl_for_classes:
         print ('Explanation for class [%d] = %s' %(class_index, class_names[class_index]))
         items = list(map(str, exp.as_list(label=class_index)))
         for item in items[:10]:
