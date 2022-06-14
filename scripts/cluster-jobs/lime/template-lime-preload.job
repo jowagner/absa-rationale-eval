@@ -1,0 +1,37 @@
+#!/bin/bash
+  
+#SBATCH -p compute     # which partition to run on
+#SBATCH -J l-%(shortname)s%(part)d-30h    # name for the job
+#SBATCH --mem=22000
+#SBATCH --constraint=avx2
+#SBATCH --cpus-per-task=32
+#SBATCH --ntasks=1
+#SBATCH -N 1-1
+
+
+PRJ_DIR=${HOME}/sentiment/absa-rationale-eval
+cd $PRJ_DIR
+source venv-pytorch/bin/activate
+
+SET=%(part)d
+TR_TASK=%(longname)s
+TR_TASK_SHORT=%(shortname)s
+
+for RUN in %(run)d ; do
+    echo "== Set ${SET} Run $RUN =="
+    date
+    cd $PRJ_DIR
+    MODEL_DIR=c-${TR_TASK_SHORT}-${SET}-${RUN}
+    cd $MODEL_DIR
+    ln -s ../data
+    hostname >> lime-preload-%(outsuffix)s.start
+    date     >> lime-preload-%(outsuffix)s.start
+    echo $MODEL_DIR >> lime-preload-%(outsuffix)s.start
+    touch lime-preload-%(outsuffix)s.start
+    ../scripts/get-lime-rationales.py --preload        --samples 10000 --max-tasks 1354 2> lime-preload-%(outsuffix)s-tr.err > lime-preload-%(outsuffix)s-tr.out
+    ../scripts/get-lime-rationales.py --preload --test --samples 10000 --max-tasks  415 2> lime-preload-%(outsuffix)s-te.err > lime-preload-%(outsuffix)s-te.out
+    date >> lime-preload-%(outsuffix)s.end
+    touch   lime-preload-%(outsuffix)s.end
+    date
+    echo "done"
+done
