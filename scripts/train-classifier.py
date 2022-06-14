@@ -1524,8 +1524,9 @@ if opt_predict:
         pred_dir = os.path.join(opt_task_dir, 'probs', file_id[0], file_id[1])
         if not os.path.exists(pred_dir):
             os.makedirs(pred_dir)
-        pred_path = os.path.join(pred_dir, file_id[2])
-        f = open(pred_path, 'wt')
+        pred_path_final = os.path.join(pred_dir, file_id[2])
+        pred_path_partial = pred_path_final + '.part'
+        f = open(pred_path_partial, 'wt')
         for tag, pred in file2row[file_id]:
             probs = list(map(lambda x: math.exp(x), pred))
             probs.sort()
@@ -1537,6 +1538,7 @@ if opt_predict:
                 math.exp(pred[2]) / total,
             ))
         f.close()
+        os.rename(pred_path_partial, pred_path_final)
     for path in my_tasks:
         os.unlink(path)
     duration = time.time() - start_time
