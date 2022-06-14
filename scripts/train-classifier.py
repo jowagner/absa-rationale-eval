@@ -8,6 +8,7 @@
 
 # Author: Joachim Wagner
 
+import bz2
 import hashlib
 import math
 import numpy as np
@@ -30,6 +31,8 @@ seed_for_trdev_split = None  # None = use global seed
 opt_lr1 = 10 / 1000000.0
 opt_lr2 = 30 / 1000000.0
 opt_frozen_epochs = 0
+opt_batch_size = 8       # 10 should work on a 12 GB card if not also used for graphics / GUI
+opt_auto_adjust_batch_size = True  # increase batch size x24 in "predict" mode
 opt_vbatchsize = 64
 opt_epochs = 10
 opt_gradient_method = 'integrated'
@@ -37,6 +40,9 @@ exclude_function_words = True    # only affects evaluation measures and confusio
 get_training_saliencies = True   # also print saliencies for training data in addition to dev/test
 opt_task_dir = 'tasks'           # where to find task files in predit mode
 prediction_speed = 30.3          # for deciding whether task can finish before deadline
+prediction_memory = 3600.0       # bytes per item
+max_memory = 64480 * 1024.0 ** 2
+base_memory = 2400 * 1024.0 ** 2
 
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
@@ -61,6 +67,13 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         del sys.argv[1]
     elif option in ('--fre', '--frozen-epochs'):
         opt_frozen_epochs = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--max-MiB', '--max-memory-MiB'):
+        max_memory = float(sys.argv[1]) * 1024.0 ** 2
+        del sys.argv[1]
+    elif option in ('--bs', '--batch-size'):
+        opt_batch_size = int(sys.argv[1])
+        opt_auto_adjust_batch_size = False
         del sys.argv[1]
     elif option in ('--vbs', '--virt-batch-size'):
         opt_vbatchsize = int(sys.argv[1])
@@ -118,6 +131,8 @@ elif command == 'predict':
     opt_predict = True
     deadline = time.time() + 3600.0 * float(sys.argv[3])
     sys.argv[3] = 'Full'
+    if opt_auto_adjust_batch_size:
+        opt_batch_size = 24 * opt_batch_size
 else:
     raise ValueError('unknown command %s' %command)
 
@@ -139,7 +154,7 @@ else:
 
 model_size          = 'base'  # choose between 'tiny', 'base' and 'large'
 max_sequence_length = 256
-batch_size          = 8       # 10 should work on a 12 GB card if not also used for graphics / GUI
+batch_size          = opt_batch_size
 virtual_batch_size  = opt_vbatchsize
 
 # TODO: what virtual batch size should we use
@@ -427,7 +442,7 @@ def get_task_data(
 ):
     dataset = []
     ds_idx, item_idx = None, None
-    f = open(task_path, 'rt')
+    f = bz2.open(task_path, 'rt')
     while True:
         line = f.readline()
         if not line:
@@ -459,8 +474,9 @@ def get_task_data(
     f.close()
     return dataset
 
-def get_duration_estimate(task_path):
-    f = open(task_path, 'rt')
+def get_duration_and_memory_estimate(task_path):
+    global prediction_memory
+    f = bz2.open(task_path, 'rt')
     line_count = 0
     while True:
         line = f.readline()
@@ -468,7 +484,9 @@ def get_duration_estimate(task_path):
             break
         line_count += 1
     f.close()
-    return line_count / prediction_speed
+    duration = line_count / prediction_speed
+    memory = line_count * prediction_memory
+    return duration, memory
 
 # get training data
 
@@ -532,14 +550,22 @@ if opt_predict:
     worker_id = '-'.join(worker_id)
     print('worder ID:', worker_id)
     eta = time.time()
+    emem = base_memory
     my_tasks = []
+    tasks_rejected_due_to_deadline = 0
+    tasks_rejected_due_to_memory = 0
     for entry in os.listdir(opt_task_dir):
         if not entry.endswith('.new'):
             continue
         task_path = os.path.join(opt_task_dir, entry)
-        duration = get_duration_estimate(task_path)
+        duration, memory = get_duration_and_memory_estimate(task_path)
         if eta + duration >= deadline:
             # task does not fit in before the deadline
+            tasks_rejected_due_to_deadline += 1
+            continue
+        if emem + memory >= max_memory:
+            # task does not fit into memory
+            tasks_rejected_due_to_memory += 1
             continue
         # found an eligible task
         try:
@@ -556,6 +582,12 @@ if opt_predict:
         )
         my_tasks.append(new_task_path)
         eta += duration
+        emem += memory
+    if tasks_rejected_due_to_deadline:
+        print(tasks_rejected_due_to_deadline, 'task(s) rejected due to deadline')
+    if tasks_rejected_due_to_memory:
+        print(tasks_rejected_due_to_memory, 'task(s) rejected due to memory')
+    print('accepted', len(my_tasks), 'task(s)')
 
 print('dataset size:', len(te_dataset))
 print('\nnew observed entity types:',     sorted(te_observed_entity_types - tr_observed_entity_types))

@@ -10,6 +10,7 @@
 
 # based on https://marcotcr.github.io/lime/tutorials/Lime%20-%20multiclass.html
 
+import bz2
 import hashlib
 import lime
 import numpy as np
@@ -115,7 +116,7 @@ def write_package(package, name):
     global item_index
     if not os.path.exists(task_dir):
         os.makedirs(task_dir)
-    f = open(task_dir + '/' + name + '.new', 'wt')
+    f = bz2.open(task_dir + '/' + name + '.new', 'wt')
     for item, mask in package:
         assert '\n' not in item
         f.write('%d\t%d\t%s\t%d\t' %(dataset_index, item_index, item_info, mask))
