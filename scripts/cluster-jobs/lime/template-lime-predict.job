@@ -2,7 +2,7 @@
 
 #SBATCH -p compute       # which partition to run on
 #SBATCH --gres=gpu:rtx2080ti:1
-#SBATCH -J lpd-%(shortname)s%(part)d    # name for the job
+#SBATCH -J lpd-%(shortname)s%(part)d%(run)d    # name for the job
 #SBATCH --mem=47000
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
