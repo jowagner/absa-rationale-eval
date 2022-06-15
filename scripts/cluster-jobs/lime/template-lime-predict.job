@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -p compute       # which partition to run on
-#SBATCH --gres=gpu:rtx2080ti:1
+#SBATCH --gres=gpu:%(gpu)s:1
 #SBATCH -J lpd-%(shortname)s%(part)d%(run)d    # name for the job
 #SBATCH --mem=47000
 #SBATCH --cpus-per-task=4
@@ -29,7 +29,14 @@ for RUN in %(run)d ; do
     date     >> lime-predict-%(outsuffix)s.start
     echo $MODEL_DIR >> lime-predict-%(outsuffix)s.start
     touch lime-predict-%(outsuffix)s.start
-    ../scripts/train-classifier.py --load-from best-sea.ckpt --max-MiB 62000 --speed 77.5 1234 predict 40 2> lime-predict-%(outsuffix)s.err > lime-predict-%(outsuffix)s.out
+    ../scripts/train-classifier.py  \
+        --load-from best-sea.ckpt   \
+        --max-MiB 62000             \
+	--speed 77.5                \
+	--batch-size %(batchsize)d  \
+	--hours 40                  \
+       	predict                     \
+       	2> lime-predict-%(outsuffix)s.err > lime-predict-%(outsuffix)s.out
     date >> lime-predict-%(outsuffix)s.end
     touch   lime-predict-%(outsuffix)s.end
     date

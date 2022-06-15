@@ -32,13 +32,14 @@ opt_lr1 = 10 / 1000000.0
 opt_lr2 = 30 / 1000000.0
 opt_frozen_epochs = 0
 opt_batch_size = 8       # 10 should work on a 12 GB card if not also used for graphics / GUI
-opt_auto_adjust_batch_size = True  # increase batch size x16 in "predict" mode
+auto_adjust_batch_size = True  # increase batch size x16 in "predict" mode
 opt_vbatchsize = 64
 opt_epochs = 10
 opt_gradient_method = 'integrated'
 exclude_function_words = True    # only affects evaluation measures and confusion matrices
 get_training_saliencies = True   # also print saliencies for training data in addition to dev/test
 opt_task_dir = 'tasks'           # where to find task files in predit mode
+deadline = None
 prediction_speed = 30.3          # for deciding whether task can finish before deadline
 prediction_memory = 3600.0       # bytes per item
 max_memory = 64480 * 1024.0 ** 2
@@ -77,13 +78,16 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         del sys.argv[1]
     elif option in ('--bs', '--batch-size'):
         opt_batch_size = int(sys.argv[1])
-        opt_auto_adjust_batch_size = False
+        auto_adjust_batch_size = False
         del sys.argv[1]
     elif option in ('--vbs', '--virt-batch-size'):
         opt_vbatchsize = int(sys.argv[1])
         del sys.argv[1]
     elif option in ('--epochs'):
         opt_epochs = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--deadline', '--hours'):
+        deadline = time.time() + 3600.0 * float(sys.argv[1])
         del sys.argv[1]
     elif option in ('--gradient', '--gradient-method'):
         opt_gradient_method = sys.argv[1].replace('_', ' ')
@@ -108,14 +112,24 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         usage()
         sys.exit(1)
 
-seed = int(sys.argv[1])
+if len(sys.argv) < 2:
+    usage()
+    sys.exit(1)
+
+if sys.argv[1] == 'predict':
+    seed = 1234
+else:
+    seed = int(sys.argv[1])
+    del sys.argv[1]
+
 assert 0 < seed < 2**31
 torch.manual_seed(seed)
 random.seed(seed)
 np.random.seed(seed)
 
 opt_predict = False
-command = sys.argv[2]
+command = sys.argv[1]
+del sys.argv[1]
 if command == 'train':
     skip_training = False
     skip_evaluation = False
@@ -133,14 +147,16 @@ elif command == 'predict':
     skip_evaluation = True
     skip_saliency = True
     opt_predict = True
-    deadline = time.time() + 3600.0 * float(sys.argv[3])
-    sys.argv[3] = 'Full'
-    if opt_auto_adjust_batch_size:
+    if auto_adjust_batch_size:
         opt_batch_size = 16 * opt_batch_size
 else:
     raise ValueError('unknown command %s' %command)
 
-training_task = sys.argv[3]
+if opt_predict:
+    training_task = 'Full'
+else:
+    training_task = sys.argv[1]
+
 if training_task == 'Full':     # sequence B is the review sentence as is
     training_masks = [None]
 elif training_task == 'SE':     # sequence B is only the sentiment expression, all other words are masked
@@ -570,16 +586,16 @@ if opt_predict:
         remaining_attempts -= 1
         task_path = os.path.join(opt_task_dir, entry)
         age = time.time() - os.path.getmtime(task_path)
-        if age < min_task_age:
+        if min_task_age and age < min_task_age:
             # task is too new (probably still being written to)
             tasks_rejected_due_to_age += 1
             continue
         duration, memory = get_duration_and_memory_estimate(task_path)
-        if eta + duration >= deadline:
+        if deadline and eta + duration >= deadline:
             # task does not fit in before the deadline
             tasks_rejected_due_to_deadline += 1
             continue
-        if emem + memory >= max_memory:
+        if max_memory and emem + memory >= max_memory:
             # task does not fit into memory
             tasks_rejected_due_to_memory += 1
             continue
