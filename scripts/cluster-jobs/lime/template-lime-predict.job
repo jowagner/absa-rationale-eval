@@ -1,0 +1,37 @@
+#!/bin/bash
+
+#SBATCH -p compute       # which partition to run on
+#SBATCH --gres=gpu:rtx2080ti:1
+#SBATCH -J lpd-%(shortname)s%(part)d    # name for the job
+#SBATCH --mem=47000
+#SBATCH --cpus-per-task=4
+#SBATCH --ntasks=1
+#SBATCH -N 1-1
+#SBATCH --exclude=g103
+
+
+PRJ_DIR=${HOME}/sentiment/absa-rationale-eval
+cd $PRJ_DIR
+source venv-pytorch/bin/activate
+
+SET=%(part)d
+TR_TASK=%(longname)s
+TR_TASK_SHORT=%(shortname)s
+
+for RUN in %(run)d ; do
+    echo "== Set ${SET} Run $RUN =="
+    date
+    cd $PRJ_DIR
+    MODEL_DIR=c-${TR_TASK_SHORT}-${SET}-${RUN}
+    cd $MODEL_DIR
+    ln -s ../data
+    hostname >> lime-predict-%(outsuffix)s.start
+    date     >> lime-predict-%(outsuffix)s.start
+    echo $MODEL_DIR >> lime-predict-%(outsuffix)s.start
+    touch lime-predict-%(outsuffix)s.start
+    ../scripts/train-classifier.py --load-from best-sea.ckpt --max-MiB 62000 1234 predict 40 2> lime-predict-%(outsuffix)s.err > lime-predict-%(outsuffix)s.out
+    date >> lime-predict-%(outsuffix)s.end
+    touch   lime-predict-%(outsuffix)s.end
+    date
+    echo "done"
+done
