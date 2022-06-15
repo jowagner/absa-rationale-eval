@@ -32,7 +32,7 @@ opt_lr1 = 10 / 1000000.0
 opt_lr2 = 30 / 1000000.0
 opt_frozen_epochs = 0
 opt_batch_size = 8       # 10 should work on a 12 GB card if not also used for graphics / GUI
-opt_auto_adjust_batch_size = True  # increase batch size x24 in "predict" mode
+opt_auto_adjust_batch_size = True  # increase batch size x16 in "predict" mode
 opt_vbatchsize = 64
 opt_epochs = 10
 opt_gradient_method = 'integrated'
@@ -133,7 +133,7 @@ elif command == 'predict':
     deadline = time.time() + 3600.0 * float(sys.argv[3])
     sys.argv[3] = 'Full'
     if opt_auto_adjust_batch_size:
-        opt_batch_size = 24 * opt_batch_size
+        opt_batch_size = 16 * opt_batch_size
 else:
     raise ValueError('unknown command %s' %command)
 
