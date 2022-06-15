@@ -559,9 +559,15 @@ if opt_predict:
     tasks_rejected_due_to_age = 0
     tasks_rejected_due_to_deadline = 0
     tasks_rejected_due_to_memory = 0
+    attempts = 20
+    remaining_attempts = attempts
     for entry in os.listdir(opt_task_dir):
         if not entry.endswith('.new'):
             continue
+        if not remaining_attempts:
+            print('aborting scan as rejected last %d candidates' %attempts)
+            break
+        remaining_attempts -= 1
         task_path = os.path.join(opt_task_dir, entry)
         age = time.time() - os.path.getmtime(task_path)
         if age < min_task_age:
@@ -593,6 +599,7 @@ if opt_predict:
         my_tasks.append(new_task_path)
         eta += duration
         emem += memory
+        remaining_attempts = attempts
     if tasks_rejected_due_to_age:
         print(tasks_rejected_due_to_age, 'task(s) rejected due to age')
     if tasks_rejected_due_to_deadline:
