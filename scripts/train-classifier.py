@@ -69,6 +69,9 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     elif option in ('--fre', '--frozen-epochs'):
         opt_frozen_epochs = int(sys.argv[1])
         del sys.argv[1]
+    elif option in ('--speed', '--predictions-per-second'):
+        prediction_speed = float(sys.argv[1])
+        del sys.argv[1]
     elif option in ('--max-MiB', '--max-memory-MiB'):
         max_memory = float(sys.argv[1]) * 1024.0 ** 2
         del sys.argv[1]
