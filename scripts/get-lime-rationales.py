@@ -365,4 +365,8 @@ for item_index, item in enumerate(dataset):
         right_context = tokens[index+1:index+20] + 8 * ['[<<<]']
         right_context = ' '.join(right_context)
         right_context = right_context[:40]
-        print('[%3d] %9.6f %9.6f %9.6f %s %15s %s' %(index, scores[0], scores[1], scores[2], left_context, centre, right_context))
+        row = []
+        row.append('%6d\t%14.9f\t%14.9f\t%14.9f' %(index, scores[0], scores[1], scores[2]))
+        if opt_verbose:
+            row.append('%s %15s %s' %(left_context, centre, right_context))
+        print('\t'.join(row))
