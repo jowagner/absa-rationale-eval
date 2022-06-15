@@ -68,10 +68,10 @@ if preload_tasks and max_tasks is None:
 dataset_name = ['trainig', 'test'][dataset_index]
 dataset = raw_data.get_dataset(raw_data.get_filenames(), dataset_index)[0]
 
-print('loaded %s data with %d items' %(dataset_name, len(dataset)))
+if opt_verbose: print('# Loaded %s data with %d items' %(dataset_name, len(dataset)))
 
 class_names = 'negative neutral positive'.split()
-print('class_names:', class_names)
+if opt_verbose: print('# Class_names:', class_names)
 
 # Explaining predictions using lime
 
@@ -116,7 +116,7 @@ def add_probs(mask2triplet, prob_path):
             triplet.append(float(fields[col_index]))
         mask2triplet[mask] = triplet
     if f.readline():
-        print('Warning: trailing line(s) in', prob_path)
+        print('# Warning: trailing line(s) in', prob_path)
     f.close()
     return mask2triplet
 
@@ -142,7 +142,7 @@ def write_package(package, name):
     global max_tasks
     if max_tasks is not None:
         if max_tasks == 0:
-            print('reached maximum number of tasks')
+            print('# Reached maximum number of tasks')
             sys.exit(0)
     if not os.path.exists(task_dir):
         os.makedirs(task_dir)
@@ -159,7 +159,7 @@ def write_package(package, name):
     if max_tasks is not None:
         max_tasks -= 1
 
-def is_in_preparation(dataset_index, item_index, name, verbose = False):
+def is_in_preparation(dataset_index, item_index, name):
     if os.path.exists(task_dir):
         found_task = False
         for entry in os.listdir(task_dir):
@@ -168,7 +168,7 @@ def is_in_preparation(dataset_index, item_index, name, verbose = False):
                 found_task = True
                 break
         if found_task:
-            if verbose: print('Warning: detected concurrent %s for %s in task folder' %(entry, name))
+            if opt_verbose: print('# Warning: detected concurrent %s for %s in task folder' %(entry, name))
             return True
     prob_item_dir = '%s/%d/%d' %(prob_dir, dataset_index, item_index)
     if os.path.exists(prob_item_dir):
@@ -178,7 +178,7 @@ def is_in_preparation(dataset_index, item_index, name, verbose = False):
                 # '' / .part suffix
                 found_probs = True
         if found_probs:
-            if verbose: print('Warning: detected concurrent %s for %s in prediction folder %s' %(entry, name, prob_item_dir))
+            if opt_verbose: print('# Warning: detected concurrent %s for %s in prediction folder %s' %(entry, name, prob_item_dir))
             return True
     return False
 
@@ -188,7 +188,7 @@ def get_missing_predictions(items):
                 triplet
     '''
     global preload_tasks
-    print('call of get_missing_predictions() with batch size', len(items))
+    if opt_verbose: print('# Call of get_missing_predictions() with %d item(s)' %len(items))
     if not items:
         return {}
     assert type(items[0]) is tuple
@@ -207,7 +207,7 @@ def get_missing_predictions(items):
         items = items[pick:]
         name = get_package_name(package)
         prob_path = '%s/%d/%d/%s' %(prob_dir, dataset_index, item_index, name)
-        if is_in_preparation(dataset_index, item_index, name, verbose = True):
+        if is_in_preparation(dataset_index, item_index, name):
             concurrent = True
         else:
             # normal case: task file needs to be written
@@ -215,7 +215,7 @@ def get_missing_predictions(items):
         missing.append(prob_path)
     if preload_tasks:
         return None
-    print('Waiting for predictions for %d package(s)...\n' %len(missing))
+    if opt_verbose: print('# Waiting for predictions for %d package(s)...\n' %len(missing))
     # collect answers
     retval = {}
     step = 0
@@ -253,7 +253,7 @@ def my_predict_proba(items):
                 negative, neutral and positive
     '''
     total = len(items)
-    print('call of predict_proba() with %d item(s)' %total)
+    if opt_verbose: print('# Call of predict_proba() with %d item(s)' %total)
     assert total > 0
     assert type(items[0]) == str
     # deduplicate and find cached items
@@ -275,8 +275,8 @@ def my_predict_proba(items):
                 cache_miss += 1
                 new.append((item, mask))
                 masks.add(mask)
-    print('%d item(s) after deduplication' %after_dedup)
-    print('%d unique items (%.1f%% raw, %.1f%% dedup) not in cache' %(
+    if opt_verbose: print('# %d item(s) after deduplication' %after_dedup)
+    if opt_verbose: print('# %d unique items (%.1f%% raw, %.1f%% dedup) not in cache' %(
         cache_miss,
         100.0*cache_miss/float(total),
         100.0*cache_miss/float(after_dedup),
@@ -339,9 +339,9 @@ for item_index, item in enumerate(dataset):
         labels          = [0,1,2],
     )
 
-    print()
     if opt_verbose:
         expl_for_classes = range(3)
+        print()
     else:
         expl_for_classes = []
     for class_index in expl_for_classes:
@@ -351,6 +351,7 @@ for item_index, item in enumerate(dataset):
             print(item)
         print()
 
+    print('Scores:')
     for index, centre in enumerate(tokens):
         scores = []
         for class_index in range(3):
