@@ -37,7 +37,7 @@ for RUN in %(run)d ; do
         --max-MiB 62000             \
 	--speed %(speed).3f         \
 	--batch-size %(batchsize)d  \
-	--hours 40                  \
+	--hours %(hours).3f         \
        	predict                     \
        	2> lime-predict-%(outsuffix)s.err > lime-predict-%(outsuffix)s.out
     date >> lime-predict-%(outsuffix)s.end
