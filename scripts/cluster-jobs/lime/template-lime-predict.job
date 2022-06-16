@@ -35,7 +35,7 @@ for RUN in %(run)d ; do
     ../scripts/train-classifier.py  \
         --load-from best-sea.ckpt   \
         --max-MiB 62000             \
-	--speed 77.5                \
+	--speed %(speed).3f         \
 	--batch-size %(batchsize)d  \
 	--hours 40                  \
        	predict                     \
