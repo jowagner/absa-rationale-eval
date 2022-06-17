@@ -561,6 +561,10 @@ for domain in domains:
 if opt_predict:
     worker_id = []
     try:
+        worker_id.append(os.environ['SLURM_JOB_ID'])
+    except KeyError:
+        pass
+    try:
         worker_id.append(os.environ['SLURM_TASK_PID'])
     except KeyError:
         worker_id.append('%d' %os.getpid())
