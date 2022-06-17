@@ -42,6 +42,7 @@ opt_task_dir = 'tasks'           # where to find task files in predit mode
 deadline = None
 prediction_speed = 30.3          # for deciding whether task can finish before deadline
 prediction_memory = 3600.0       # bytes per item
+prediction_checkpoint_duration = 300.0
 max_memory = 64480 * 1024.0 ** 2
 base_memory = 2400 * 1024.0 ** 2
 min_task_age = 20.0              # seconds
@@ -577,6 +578,13 @@ if opt_predict:
     tasks_rejected_due_to_memory = 0
     attempts = 20
     remaining_attempts = attempts
+    package_duration = 0.0
+    packages = []
+    total_items = 0
+    total_tasks = 0
+    max_emem = 0
+    max_package_duration = 0
+    max_tasks = 0
     for entry in os.listdir(opt_task_dir):
         if not entry.endswith('.new'):
             continue
@@ -612,7 +620,19 @@ if opt_predict:
             new_task_path, task_name,
             te_observed_entity_types, te_observed_attribute_labels,
         )
+        package_duration += duration
         my_tasks.append(new_task_path)
+        if package_duration > prediction_checkpoint_duration:
+            packages.append((te_dataset, my_tasks))
+            total_items += len(te_dataset)
+            total_tasks += len(my_tasks)
+            max_emem = max(max_emem, emem)
+            max_package_duration = max(max_package_duration, package_duration)
+            max_tasks = max(max_tasks, len(my_tasks))
+            te_dataset = []
+            package_duration = 0.0
+            emem = base_memory
+            my_tasks = []
         eta += duration
         emem += memory
         remaining_attempts = attempts
@@ -622,14 +642,29 @@ if opt_predict:
         print(tasks_rejected_due_to_deadline, 'task(s) rejected due to deadline')
     if tasks_rejected_due_to_memory:
         print(tasks_rejected_due_to_memory, 'task(s) rejected due to memory')
-    print('accepted', len(my_tasks), 'task(s)')
+    if te_dataset:
+        packages.append((te_dataset, my_tasks))
+        total_items += len(te_dataset)
+        total_tasks += len(my_tasks)
+        max_emem = max(max_emem, emem)
+        max_package_duration = max(max_package_duration, package_duration)
+        max_tasks = max(max_tasks, len(my_tasks))
+    print('accepted', total_tasks, 'task(s)')
+    print('%d package(s)' %len(packages))
+    print('highest estimated package memory: %.1fMiB' %(max_emem/1024.0**2))
+    print('highest estimated package duration: %.1fs' %max_package_duration)
+    print('highest number of tasks in a package: %d' %max_tasks)
+else:
+    print('dataset size:', len(te_dataset))
 
-print('dataset size:', len(te_dataset))
 print('\nnew observed entity types:',     sorted(te_observed_entity_types - tr_observed_entity_types))
 print('\nnew observed attribute labels:', sorted(te_observed_attribute_labels - tr_observed_attribute_labels))
 print('\nnew observed polarities:',       sorted(te_observed_polarities - tr_observed_polarities))
 print('\nnumber of unique targets:',  len(te_observed_targets))
 
+if opt_predict:
+    te_dataset, my_tasks = packages[0]
+    print('The following test set statistics are for the first package.')
 
 # 2.2 Training-Dev Split
 
@@ -910,8 +945,12 @@ if skip_evaluation or opt_predict:
 else:
     test_masks = (None, 'O', 'I', '*')
 
-te_dataset_objects = []
-for mask in test_masks:
+def get_te_dataset_objects(te_dataset):
+  global test_masks
+  global templates
+  global put_question_first
+  te_dataset_objects = []
+  for mask in test_masks:
     for template_index in range(len(templates)):
         te_dataset_objects.append(ABSA_Dataset(
             te_dataset,
@@ -920,6 +959,9 @@ for mask in test_masks:
             mask = mask,
             info = 'q%d' %template_index
         ))
+  return te_dataset_objects
+
+te_dataset_objects = get_te_dataset_objects(te_dataset)
 
 # also provide a test set that is the union of the above test sets
 
@@ -1519,7 +1561,12 @@ def get_predictions(te_dataset_object):
         next_idx_2 += 1
     return op_id2triplet
 
-if opt_predict:
+package_index = 0
+while opt_predict and package_index < len(packages):
+    print('Package %d of %d' %(package_index + 1, len(packages)))
+    if package_index > 0:
+        te_dataset, my_tasks = packages[package_index]
+        te_dataset_objects = get_te_dataset_objects(te_dataset)
     start_time = time.time()
     assert len(te_dataset_objects) == 1
     te_dataset_object = te_dataset_objects[0]
@@ -1527,7 +1574,7 @@ if opt_predict:
     assert len(templates) == 1
     template_index = 0
     question = templates[template_index]['question']
-    print('\nTest set with Mask %s, i.e. using %s, with question template %d, i.e. %r' %(
+    print('Test set with Mask %s, i.e. using %s, with question template %d, i.e. %r' %(
         te_dataset_object.mask,
         mask2seqb[te_dataset_object.mask],
         template_index, question
@@ -1566,12 +1613,16 @@ if opt_predict:
         f.close()
         os.rename(pred_path_partial, pred_path_final)
     for path in my_tasks:
-        os.unlink(path)
+        try:
+            os.unlink(path)
+        except:
+            print('Warning: failure removing no longer needed file', path)
     duration = time.time() - start_time
     n = len(te_dataset_object)
     print('%.1f seconds for %d predictions: speed = %.3f predictions per second' %(
          duration, n, n / duration
     ))
+    package_index += 1
 
 if skip_saliency:
     sys.exit(0)
@@ -1658,6 +1709,10 @@ def interpret(model, instances, labels, variant = 'integrated'):
     for alpha in get_alphas(variant):
         def forward_hook(module, inputs, outputs):
             if alpha == 1:
+                # TODO: What happens when alpha goes beyond 1, e.g. for "seven points" defined above?
+                #       First impression is that alpha needs to be 1 exactly once and with
+                #       symmetric end points and odd number of steps this condition is met.
+                #       See issue #42.
                 forward_embeddings.append(outputs)
             else:
                 outputs.mul_(alpha)

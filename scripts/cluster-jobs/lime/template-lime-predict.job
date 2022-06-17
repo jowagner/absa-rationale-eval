@@ -8,6 +8,8 @@
 #SBATCH --ntasks=1
 #SBATCH -N 1-1
 #SBATCH --exclude=g103
+#SBATCH --no-requeue
+#SBATCH --qos=preempt
 %(more_sbatch)s
 
 
@@ -19,6 +21,8 @@ SET=%(part)d
 TR_TASK=%(longname)s
 TR_TASK_SHORT=%(shortname)s
 
+OUTNAME=lime-predict-%(outsuffix)s-$(scripts/get-slurm-restart-count.py 3)
+
 for RUN in %(run)d ; do
     echo "== Set ${SET} Run $RUN =="
     date
@@ -26,22 +30,22 @@ for RUN in %(run)d ; do
     MODEL_DIR=c-${TR_TASK_SHORT}-${SET}-${RUN}
     cd $MODEL_DIR
     ln -s ../data
-    hostname >> lime-predict-%(outsuffix)s.start
-    date     >> lime-predict-%(outsuffix)s.start
-    echo $MODEL_DIR >> lime-predict-%(outsuffix)s.start
-    echo $SLURM_JOB_ID >> lime-predict-%(outsuffix)s.start
-    nvidia-smi         >> lime-predict-%(outsuffix)s.start
-    touch lime-predict-%(outsuffix)s.start
+    hostname >> ${OUTNAME}.start
+    date     >> ${OUTNAME}.start
+    echo $MODEL_DIR >> ${OUTNAME}.start
+    echo $SLURM_JOB_ID >> ${OUTNAME}.start
+    nvidia-smi         >> ${OUTNAME}.start
+    touch ${OUTNAME}.start
     ../scripts/train-classifier.py  \
         --load-from best-sea.ckpt   \
         --max-MiB 62000             \
-	--speed %(speed).3f         \
-	--batch-size %(batchsize)d  \
-	--hours %(hours).3f         \
-       	predict                     \
-       	2> lime-predict-%(outsuffix)s.err > lime-predict-%(outsuffix)s.out
-    date >> lime-predict-%(outsuffix)s.end
-    touch   lime-predict-%(outsuffix)s.end
+        --speed %(speed).3f         \
+        --batch-size %(batchsize)d  \
+        --hours %(hours).3f         \
+        predict                     \
+        2> ${OUTNAME}.err > ${OUTNAME}.out
+    date >> ${OUTNAME}.end
+    touch   ${OUTNAME}.end
     date
     echo "done"
 done
