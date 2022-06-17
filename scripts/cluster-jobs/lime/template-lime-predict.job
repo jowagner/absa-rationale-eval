@@ -3,12 +3,12 @@
 #SBATCH -p compute       # which partition to run on
 #SBATCH --gres=gpu:%(gpu)s:1
 #SBATCH -J lpd-%(shortname)s%(part)d%(run)d    # name for the job
-#SBATCH --mem=47000
+#SBATCH --mem=7168
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
 #SBATCH -N 1-1
 #SBATCH --exclude=g103
-#SBATCH --no-requeue
+#SBATCH --requeue
 #SBATCH --qos=preempt
 %(more_sbatch)s
 
@@ -38,7 +38,7 @@ for RUN in %(run)d ; do
     touch ${OUTNAME}.start
     ../scripts/train-classifier.py  \
         --load-from best-sea.ckpt   \
-        --max-MiB 62000             \
+        --max-MiB 4096              \
         --speed %(speed).3f         \
         --batch-size %(batchsize)d  \
         --hours %(hours).3f         \
