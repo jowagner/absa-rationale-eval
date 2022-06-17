@@ -10,6 +10,9 @@ if len(sys.argv) > 1 and sys.argv[1] == 'sevenpoints':
 elif len(sys.argv) > 1 and sys.argv[1] == 'shortline-test':
     outsuffix = 'shortline-test-xfw'
     options   = '--load-model-from best-sea.ckpt --gradient-method short_line --test-saliencies-only'
+elif len(sys.argv) > 1 and sys.argv[1] == 'point':
+    outsuffix = 'onepoint-xfw'
+    options   = '--load-model-from best-sea.ckpt --gradient-method point'
 else:
     outsuffix = 'morewio-xfw'
     options   = '--load-model-from best-sea.ckpt'
@@ -19,9 +22,6 @@ else:
 
 for shortname, longname in [
     ('f', 'Full'),
-    #('s', 'SE'),
-    #('o', 'Other'),
-    #('a', 'All'),
 ]:
     for part in (1,2,3,4):
       for run in (1,2,3):
