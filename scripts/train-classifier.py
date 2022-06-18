@@ -584,6 +584,7 @@ def get_packages():
     print('found %s candidate task(s)' %len(candidates))
     eta = time.time()
     emem = base_memory
+    te_dataset = []
     my_tasks = []
     tasks_rejected_due_to_age = 0
     tasks_rejected_due_to_deadline = 0
@@ -624,6 +625,12 @@ def get_packages():
         except:
             print('could not claim task', entry)
             continue
+        if not os.path.exists(new_task_path):
+            print('missing task after renaming it to', new_task_path)
+            time.sleep(60.0)
+            if not os.path.exists(new_task_path):
+                print('file still missing after 60 seconds; skipping')
+                continue
         # add data
         task_name = entry[:-4]
         te_dataset += get_task_data(
@@ -634,7 +641,7 @@ def get_packages():
         my_tasks.append(new_task_path)
         if entry == candidates[-1][1]  \
         or package_duration > prediction_checkpoint_duration:
-            print('new package with %d tasks and %d items')
+            print('new package with %d tasks' %len(my_tasks))
             total_items += len(te_dataset)
             total_tasks += len(my_tasks)
             max_emem = max(max_emem, emem)
