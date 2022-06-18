@@ -558,22 +558,30 @@ for domain in domains:
         te_observed_polarities,   te_observed_targets
     )
 
-if opt_predict:
+def get_packages():
     worker_id = []
     try:
         worker_id.append(os.environ['SLURM_JOB_ID'])
     except KeyError:
         pass
     try:
-        worker_id.append(os.environ['SLURM_TASK_PID'])
-    except KeyError:
-        worker_id.append('%d' %os.getpid())
-    try:
         worker_id.append(os.environ['SLURM_JOB_NODELIST'])
     except KeyError:
         worker_id.append(os.uname()[1])
+    try:
+        worker_id.append(os.environ['SLURM_TASK_PID'])
+    except KeyError:
+        worker_id.append('%d' %os.getpid())
     worker_id = '-'.join(worker_id)
     print('worder ID:', worker_id)
+    candidates = []
+    for entry in os.listdir(opt_task_dir):
+        if entry.endswith('.new'):
+            key = '%s:%s' %(worker_id, entry)
+            key = hashlib.sha256(key.encode('UTF-8')).hexdigest()
+            candidates.append((key, entry))
+    candidates.sort()
+    print('found %s candidate task(s)' %len(candidates))
     eta = time.time()
     emem = base_memory
     my_tasks = []
@@ -589,9 +597,7 @@ if opt_predict:
     max_emem = 0
     max_package_duration = 0
     max_tasks = 0
-    for entry in os.listdir(opt_task_dir):
-        if not entry.endswith('.new'):
-            continue
+    for _, entry in candidates:
         if not remaining_attempts:
             print('aborting scan as rejected last %d candidates' %attempts)
             break
@@ -626,13 +632,15 @@ if opt_predict:
         )
         package_duration += duration
         my_tasks.append(new_task_path)
-        if package_duration > prediction_checkpoint_duration:
-            packages.append((te_dataset, my_tasks))
+        if entry == candidates[-1][1]  \
+        or package_duration > prediction_checkpoint_duration:
+            print('new package with %d tasks and %d items')
             total_items += len(te_dataset)
             total_tasks += len(my_tasks)
             max_emem = max(max_emem, emem)
             max_package_duration = max(max_package_duration, package_duration)
             max_tasks = max(max_tasks, len(my_tasks))
+            yield te_dataset, my_tasks
             te_dataset = []
             package_duration = 0.0
             emem = base_memory
@@ -646,29 +654,20 @@ if opt_predict:
         print(tasks_rejected_due_to_deadline, 'task(s) rejected due to deadline')
     if tasks_rejected_due_to_memory:
         print(tasks_rejected_due_to_memory, 'task(s) rejected due to memory')
-    if te_dataset:
-        packages.append((te_dataset, my_tasks))
-        total_items += len(te_dataset)
-        total_tasks += len(my_tasks)
-        max_emem = max(max_emem, emem)
-        max_package_duration = max(max_package_duration, package_duration)
-        max_tasks = max(max_tasks, len(my_tasks))
+    assert len(te_dataset) == 0
     print('accepted', total_tasks, 'task(s)')
     print('%d package(s)' %len(packages))
     print('highest estimated package memory: %.1fMiB' %(max_emem/1024.0**2))
     print('highest estimated package duration: %.1fs' %max_package_duration)
     print('highest number of tasks in a package: %d' %max_tasks)
-else:
-    print('dataset size:', len(te_dataset))
+
+print('dataset size:', len(te_dataset))
 
 print('\nnew observed entity types:',     sorted(te_observed_entity_types - tr_observed_entity_types))
 print('\nnew observed attribute labels:', sorted(te_observed_attribute_labels - tr_observed_attribute_labels))
 print('\nnew observed polarities:',       sorted(te_observed_polarities - tr_observed_polarities))
 print('\nnumber of unique targets:',  len(te_observed_targets))
 
-if opt_predict:
-    te_dataset, my_tasks = packages[0]
-    print('The following test set statistics are for the first package.')
 
 # 2.2 Training-Dev Split
 
@@ -1565,12 +1564,11 @@ def get_predictions(te_dataset_object):
         next_idx_2 += 1
     return op_id2triplet
 
-package_index = 0
-while opt_predict and package_index < len(packages):
-    print('Package %d of %d' %(package_index + 1, len(packages)))
-    if package_index > 0:
-        te_dataset, my_tasks = packages[package_index]
-        te_dataset_objects = get_te_dataset_objects(te_dataset)
+if opt_predict:
+  package_index = 0
+  for te_dataset, my_tasks in get_packages():
+    print('package %d' %(package_index + 1))
+    te_dataset_objects = get_te_dataset_objects(te_dataset)
     start_time = time.time()
     assert len(te_dataset_objects) == 1
     te_dataset_object = te_dataset_objects[0]
