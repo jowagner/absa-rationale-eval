@@ -42,7 +42,7 @@ opt_task_dir = 'tasks'           # where to find task files in predit mode
 deadline = None
 prediction_speed = 30.3          # for deciding whether task can finish before deadline
 prediction_memory = 3600.0       # bytes per item
-prediction_checkpoint_duration = 300.0
+prediction_checkpoint_duration = 90.0
 max_memory = 64480 * 1024.0 ** 2
 base_memory = 2400 * 1024.0 ** 2
 min_task_age = 20.0              # seconds
@@ -595,6 +595,7 @@ def get_packages():
     packages = []
     total_items = 0
     total_tasks = 0
+    total_packages = 0
     max_emem = 0
     max_package_duration = 0
     max_tasks = 0
@@ -641,13 +642,14 @@ def get_packages():
         my_tasks.append(new_task_path)
         if entry == candidates[-1][1]  \
         or package_duration > prediction_checkpoint_duration:
-            print('new package with %d tasks' %len(my_tasks))
+            print('\n\nnew package with %d tasks' %len(my_tasks))
             total_items += len(te_dataset)
             total_tasks += len(my_tasks)
             max_emem = max(max_emem, emem)
             max_package_duration = max(max_package_duration, package_duration)
             max_tasks = max(max_tasks, len(my_tasks))
             yield te_dataset, my_tasks
+            total_packages += 1
             te_dataset = []
             package_duration = 0.0
             emem = base_memory
@@ -663,7 +665,7 @@ def get_packages():
         print(tasks_rejected_due_to_memory, 'task(s) rejected due to memory')
     assert len(te_dataset) == 0
     print('accepted', total_tasks, 'task(s)')
-    print('%d package(s)' %len(packages))
+    print('%d package(s)' %total_packages)
     print('highest estimated package memory: %.1fMiB' %(max_emem/1024.0**2))
     print('highest estimated package duration: %.1fs' %max_package_duration)
     print('highest number of tasks in a package: %d' %max_tasks)
