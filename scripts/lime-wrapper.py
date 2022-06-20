@@ -247,11 +247,14 @@ def get_mask(sentence):
             mask = mask + 1
     return mask
 
+cache = None
+
 def my_predict_proba(items):
     ''' input: list of d strings
         output: a (d, 3) numpy array with probabilities for
                 negative, neutral and positive
     '''
+    global cache
     total = len(items)
     if opt_verbose: print('# Call of predict_proba() with %d item(s)' %total)
     assert total > 0
@@ -298,10 +301,6 @@ def my_predict_proba(items):
             retval[row_index, col_index] = triplet[col_index]
     return retval
 
-    # TODO: Can we return one-hot vectors or does LIME not work well for
-    #       over-confident classifiers?
-    #       https://github.com/marcotcr/lime/issues/615 suggests probabilities are much preferred.
-
 for item_index, item in enumerate(dataset):
     domain, opinion_id, text, \
             tokens, sea, \
@@ -332,12 +331,32 @@ for item_index, item in enumerate(dataset):
     item_info = '%s\t%s\t%s' %(domain, entity_type, attribute_label)  # hack to pass info around LIME
 
     exp = explainer.explain_instance(
-        text_instance   = ' '.join(tokens),  # raw text (before my_tokeniser())
+        text_instance   = ' '.join(tokens),  # will be sent to my_tokeniser()
         classifier_fn   = my_predict_proba,
         num_features    = max_n_features,
         num_samples     = num_samples,
         labels          = [0,1,2],
     )
+
+    try:
+        triplet = cache[0]
+    except KeyError
+        triplet = None
+    if triplet:
+        candidates = []
+        for p_index, prob in enumerate(triplet):
+            label = class_names[p_index]
+            tiebreaker = '%d:%d:%s' %(dataset_index, item_index, label)
+            tiebreaker = hashlib.sha256(tiebreaker.encode('UTF-8')).hexdigest()
+            candidates.append((-prob, tiebreaker, label))
+        candidates.sort()
+        row = []
+        row.append('Prediction:')
+        row.append(candidates[0][-1])
+        for prob in triplet:
+            row.append('%.9f' %prob)
+        print('\t'.join(row))
+        print()
 
     if opt_verbose:
         expl_for_classes = range(3)
