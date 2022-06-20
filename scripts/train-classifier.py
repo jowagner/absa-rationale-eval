@@ -674,6 +674,8 @@ def get_packages():
             eta = now
             emem = base_memory
             my_tasks = []
+            if not remaining_attempts:
+                break
     if tasks_rejected_due_to_age:
         print(tasks_rejected_due_to_age, 'task(s) rejected due to age')
     if tasks_rejected_due_to_deadline:
