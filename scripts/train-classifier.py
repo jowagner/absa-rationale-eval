@@ -605,45 +605,52 @@ def get_packages():
             break
         remaining_attempts -= 1
         task_path = os.path.join(opt_task_dir, entry)
+        skip_task = False
         try:
             age = time.time() - os.path.getmtime(task_path)
         except:
             # task probably claimed by other worker
-            continue
-        if min_task_age and age < min_task_age:
+            skip_task = True
+        if not skip_task and min_task_age and age < min_task_age:
             # task is too new (probably still being written to)
             tasks_rejected_due_to_age += 1
-            continue
-        duration, memory = get_duration_and_memory_estimate(task_path)
-        if deadline and eta + duration >= deadline:
-            # task does not fit in before the deadline
-            tasks_rejected_due_to_deadline += 1
-            continue
-        if max_memory and emem + memory >= max_memory:
-            # task does not fit into memory
-            tasks_rejected_due_to_memory += 1
-            continue
-        # found an eligible task
-        try:
-            new_task_path = task_path[:-3] + worker_id
-            os.rename(task_path, new_task_path)
-        except:
-            print('could not claim task', entry)
-            continue
-        if not os.path.exists(new_task_path):
+            skip_task = True
+        if not skip_task:
+            duration, memory = get_duration_and_memory_estimate(task_path)
+            if deadline and eta + duration >= deadline:
+                # task does not fit in before the deadline
+                tasks_rejected_due_to_deadline += 1
+                skip_task = True
+            if max_memory and emem + memory >= max_memory:
+                # task does not fit into memory
+                tasks_rejected_due_to_memory += 1
+                skip_task
+        if not skip_task:
+            # found an eligible task
+            try:
+                new_task_path = task_path[:-3] + worker_id
+                os.rename(task_path, new_task_path)
+            except:
+                print('could not claim task', entry)
+                skip_task = True
+        if not skip_task and not os.path.exists(new_task_path):
             print('missing task after renaming it to', new_task_path)
             time.sleep(60.0)
             if not os.path.exists(new_task_path):
                 print('file still missing after 60 seconds; skipping')
-                continue
-        # add data
-        task_name = entry[:-4]
-        te_dataset += get_task_data(
-            new_task_path, task_name,
-            te_observed_entity_types, te_observed_attribute_labels,
-        )
-        package_duration += duration
-        my_tasks.append(new_task_path)
+                skip_task = True
+        if not skip_task:
+            # add data
+            task_name = entry[:-4]
+            te_dataset += get_task_data(
+                new_task_path, task_name,
+                te_observed_entity_types, te_observed_attribute_labels,
+            )
+            package_duration += duration
+            eta += duration
+            emem += memory
+            remaining_attempts = attempts  # reset attempts counter
+            my_tasks.append(new_task_path)
         if entry == candidates[-1][1]  \
         or package_duration > prediction_checkpoint_duration:
             print('\n\nnew package with %d tasks' %len(my_tasks))
@@ -658,9 +665,6 @@ def get_packages():
             package_duration = 0.0
             emem = base_memory
             my_tasks = []
-        eta += duration
-        emem += memory
-        remaining_attempts = attempts
     if tasks_rejected_due_to_age:
         print(tasks_rejected_due_to_age, 'task(s) rejected due to age')
     if tasks_rejected_due_to_deadline:
