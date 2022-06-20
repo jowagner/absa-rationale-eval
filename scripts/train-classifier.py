@@ -558,7 +558,7 @@ for domain in domains:
         te_observed_polarities,   te_observed_targets
     )
 
-def get_packages():
+def get_worker_id():
     worker_id = []
     try:
         worker_id.append(os.environ['SLURM_JOB_ID'])
@@ -572,7 +572,10 @@ def get_packages():
         worker_id.append(os.environ['SLURM_TASK_PID'])
     except KeyError:
         worker_id.append('%d' %os.getpid())
-    worker_id = '-'.join(worker_id)
+    return '-'.join(worker_id)
+
+def get_packages():
+    worker_id = get_worker_id()
     print('worder ID:', worker_id)
     candidates = []
     for entry in os.listdir(opt_task_dir):
@@ -582,7 +585,6 @@ def get_packages():
             candidates.append((key, entry))
     candidates.sort()
     print('found %s candidate task(s)' %len(candidates))
-    eta = time.time()
     emem = base_memory
     te_dataset = []
     my_tasks = []
@@ -619,7 +621,8 @@ def get_packages():
             skip_task = True
         if not skip_task:
             duration, memory = get_duration_and_memory_estimate(task_path)
-            if deadline and eta + duration >= deadline:
+            eta_so_far = time.time() + package_duration
+            if deadline and eta_so_far + duration >= deadline:
                 # task does not fit in before the deadline
                 tasks_rejected_due_to_deadline += 1
                 skip_task = True
@@ -649,7 +652,6 @@ def get_packages():
                 te_observed_entity_types, te_observed_attribute_labels,
             )
             package_duration += duration
-            eta += duration
             emem += memory
             remaining_attempts = attempts  # reset attempts counter
             my_tasks.append(new_task_path)
@@ -658,7 +660,7 @@ def get_packages():
             print('\n\nnew package with %d tasks' %len(my_tasks))
             now = time.time()
             print('current time:', time.ctime(now))
-            print('package ETA: ', time.ctime(eta))
+            print('package ETA: ', time.ctime(now+package_duration))
             print('package estimated duration: %.1fs' %package_duration)
             total_items += len(te_dataset)
             total_tasks += len(my_tasks)
@@ -1401,7 +1403,10 @@ if not skip_training:
         limit_train_batches     = limit_train_batches,
         check_val_every_n_epoch = 1,
         # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
-        logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
+        logger = pl.loggers.TensorBoardLogger(os.path.join(
+            os.path.abspath('lightning_logs'),
+            get_worker_id(),
+        )),
     )
 
 
@@ -1440,7 +1445,10 @@ if not skip_training:
         resume_from_checkpoint = trainer.checkpoint_callback.best_model_path,
         gpus = -1,  # avoid warnings (-1 = automatic selection)
         # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
-        logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
+        logger = pl.loggers.TensorBoardLogger(os.path.join(
+            os.path.abspath('lightning_logs'),
+            get_worker_id(),
+        )),
     )
     new_trainer.model = best_model  # @model.setter in plugins/training_type/training_type_plugin.py
 
@@ -1480,7 +1488,13 @@ if not skip_training:
 # 5.2 Load and Test Model
 
 best_model = Classifier.load_from_checkpoint(
-    checkpoint_path = opt_load_model_from
+    checkpoint_path = opt_load_model_from,
+    # pass logger with per-job log folder
+    # (as part of "any extra keyword args needed to init the model")
+    logger = pl.loggers.TensorBoardLogger(os.path.join(
+        os.path.abspath('lightning_logs'),
+        get_worker_id(),
+    )),
 )
 
 best_model.eval()  # enter prediction mode, e.g. turn off dropout
@@ -1498,7 +1512,10 @@ def test_and_print(te_dataset_object):
     new_trainer = pl.Trainer(
         gpus = -1,
         # https://github.com/PyTorchLightning/pytorch-lightning/issues/6690
-        logger = pl.loggers.TensorBoardLogger(os.path.abspath('lightning_logs')),
+        logger = pl.loggers.TensorBoardLogger(os.path.join(
+            os.path.abspath('lightning_logs'),
+            get_worker_id(),
+        )),
     )
     if best_model.tokenizer is None:
         #print('setting tokeniser')
@@ -1564,6 +1581,7 @@ if not skip_evaluation:
     print('\n'.join(summary))
 
 def get_predictions(te_dataset_object):
+    global best_model
     best_model.reset_recorded_predictions()
     best_model.start_recording_predictions()
     test_and_print(te_dataset_object)
