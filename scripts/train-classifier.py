@@ -605,7 +605,11 @@ def get_packages():
             break
         remaining_attempts -= 1
         task_path = os.path.join(opt_task_dir, entry)
-        age = time.time() - os.path.getmtime(task_path)
+        try:
+            age = time.time() - os.path.getmtime(task_path)
+        except:
+            # task probably claimed by other worker
+            continue
         if min_task_age and age < min_task_age:
             # task is too new (probably still being written to)
             tasks_rejected_due_to_age += 1
