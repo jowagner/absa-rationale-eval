@@ -28,8 +28,8 @@ for RUN in %(run)d ; do
     date     >> lime-preload-%(outsuffix)s.start
     echo $MODEL_DIR >> lime-preload-%(outsuffix)s.start
     touch lime-preload-%(outsuffix)s.start
-    ../scripts/get-lime-rationales.py --preload        --samples 1250 --max-tasks 13540 2> lime-preload-%(outsuffix)s-tr.err > lime-preload-%(outsuffix)s-tr.out
-    ../scripts/get-lime-rationales.py --preload --test --samples 1250 --max-tasks  4150 2> lime-preload-%(outsuffix)s-te.err > lime-preload-%(outsuffix)s-te.out
+    ../scripts/lime-wrapper.py --preload        --samples 1250 --max-tasks 13540 2> lime-preload-%(outsuffix)s-tr.err > lime-preload-%(outsuffix)s-tr.out
+    ../scripts/lime-wrapper.py --preload --test --samples 1250 --max-tasks  4150 2> lime-preload-%(outsuffix)s-te.err > lime-preload-%(outsuffix)s-te.out
     date >> lime-preload-%(outsuffix)s.end
     touch   lime-preload-%(outsuffix)s.end
     date
