@@ -600,17 +600,19 @@ def get_packages():
     max_package_duration = 0
     max_tasks = 0
     for _, entry in candidates:
+        skip_task = False
         if not remaining_attempts:
             print('aborting scan as rejected last %d candidates' %attempts)
-            break
-        remaining_attempts -= 1
-        task_path = os.path.join(opt_task_dir, entry)
-        skip_task = False
-        try:
-            age = time.time() - os.path.getmtime(task_path)
-        except:
-            # task probably claimed by other worker
             skip_task = True
+        else:
+            remaining_attempts -= 1
+        if not skip_task:
+            task_path = os.path.join(opt_task_dir, entry)
+            try:
+                age = time.time() - os.path.getmtime(task_path)
+            except:
+                # task probably claimed by other worker
+                skip_task = True
         if not skip_task and min_task_age and age < min_task_age:
             # task is too new (probably still being written to)
             tasks_rejected_due_to_age += 1
@@ -654,6 +656,10 @@ def get_packages():
         if entry == candidates[-1][1]  \
         or package_duration > prediction_checkpoint_duration:
             print('\n\nnew package with %d tasks' %len(my_tasks))
+            now = time.time()
+            print('current time:', time.ctime(now))
+            print('package ETA: ', time.ctime(eta))
+            print('package estimated duration: %.1fs' %package_duration)
             total_items += len(te_dataset)
             total_tasks += len(my_tasks)
             max_emem = max(max_emem, emem)
@@ -663,6 +669,7 @@ def get_packages():
             total_packages += 1
             te_dataset = []
             package_duration = 0.0
+            eta = now
             emem = base_memory
             my_tasks = []
     if tasks_rejected_due_to_age:
