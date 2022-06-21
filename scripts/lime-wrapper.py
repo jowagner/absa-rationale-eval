@@ -313,7 +313,8 @@ for item_index, item in enumerate(dataset):
     print('domain', domain)
     print('opinion_id', opinion_id)
     print('text', text)
-    print('tokens', tokens)
+    print('tokens', ' '.join(tokens))
+    print('sea', ' '.join(sea))
     print('entity_type', entity_type)
     print('attribute_label', attribute_label)
     print('target', target)
@@ -340,9 +341,10 @@ for item_index, item in enumerate(dataset):
 
     try:
         triplet = cache[0]
-    except KeyError
+    except KeyError:
         triplet = None
     if triplet:
+        print()
         candidates = []
         for p_index, prob in enumerate(triplet):
             label = class_names[p_index]
@@ -356,11 +358,12 @@ for item_index, item in enumerate(dataset):
         for prob in triplet:
             row.append('%.9f' %prob)
         print('\t'.join(row))
+
+    if triplet or opt_verbose:
         print()
 
     if opt_verbose:
         expl_for_classes = range(3)
-        print()
     else:
         expl_for_classes = []
     for class_index in expl_for_classes:
