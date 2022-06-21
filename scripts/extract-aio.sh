@@ -37,39 +37,39 @@ for L in L25 L50 L75 ; do
             rm -f $I/train-${D}-L?5-wcloud.tsv
 done ; done ; done
 
-(2) saliency based on point gradient
+# (2) saliency based on point gradient
 
 LOGNAME=saliency-onepoint-xfw-stdout.txt
 
-for L in P25 P50 P75 ; do
+for T in 25 50 75 ; do
+    L=L${T}
+    P=P${T}
     for D in laptop restaurant ; do
         for I in c-f-?-? ; do
             echo $L $D $I
             grep -E "^"${L}"\s"${D}"\s(training|dev)\s" -A 1 $I/$LOGNAME \
                 | grep -v -E "^--$" \
-                | tee $I/train-${D}-${L}-wcloud.tsv \
+                | tee $I/train-${D}-${P}-wcloud.tsv \
                 | cut -f4,5,6 \
                 | scripts/sort-aio-by-id.py \
-                | cut -f2,3 > $I/train-${D}-${L}.aio
+                | cut -f2,3 > $I/train-${D}-${P}.aio
             grep -E "^"${L}"\s"${D}"\stest\s" -A 1 $I/$LOGNAME \
                 | grep -v -E "^--$" \
-                | tee $I/test-${D}-${L}-wcloud.tsv \
+                | tee $I/test-${D}-${P}-wcloud.tsv \
                 | cut -f4,5,6 \
                 | scripts/sort-aio-by-id.py \
-                | cut -f2,3 > $I/test-${D}-${L}.aio
+                | cut -f2,3 > $I/test-${D}-${P}.aio
             # only keep wcloud.tsv for P50
             rm -f $I/train-${D}-P?5-wcloud.tsv
 done ; done ; done
 
-(3) saliency based on LIME scores
+# (3) saliency based on LIME scores
 
 LOGNAMEPREFIX=lime-score-p1-verbose
 
 for I in c-f-?-? ; do
     echo LIME $I
-    scripts/get-lime-rationales.py  \
+    scripts/lime-scores-to-aio.py  \
         --workdir $I                \
-        --prefix  $LOGNAMEPREFIX    \
-	--thresholds "25,50,75"     \
-	--wordcloud  50
+        --prefix  $LOGNAMEPREFIX
 done
