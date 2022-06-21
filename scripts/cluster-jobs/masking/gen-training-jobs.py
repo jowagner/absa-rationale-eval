@@ -42,6 +42,12 @@ for tr_task_short, tr_task_long, hours in [
      ('RND25', True, 'best-RND25.ckpt'),
      ('RND50', True, 'best-RND50.ckpt'),
      ('RND75', True, 'best-RND75.ckpt'),
+     ('P25', True,  'best-P25.ckpt'),
+     ('P50', True,  'best-P50.ckpt'),
+     ('P75', True,  'best-P75.ckpt'),
+     ('N25', True,  'best-N25.ckpt'),
+     ('N50', True,  'best-N50.ckpt'),
+     ('N75', True,  'best-N75.ckpt'),
   ]:
     for set_rank in (1,2,3,4):
         with open('run-train-c-%s-%s-%d1-to-%d3.job' %(   #-hp-%d.job' %(
@@ -102,7 +108,7 @@ for RUN in 1 2 3 ; do
         for D in laptop restaurant ; do
             for T in train test ; do
 """ %locals())
-                if aio_name.startswith('L'):
+                if aio_name[0] in 'LMPSX':
                     f.write("""
                 cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio $LAIODIR/${T}.${D}.aio
 """ %locals())

@@ -17,6 +17,7 @@ gpu_index = 0
 shortname, longname = ('f', 'Full')
 
 for gpu, batchsize, speed, hours, more_sbatch in gpus:   # [gpu_index]
+    # TODO: add option to add --requeue and --qos=preempt
     for part in (1,2,3,4):
       for run in (1,2,3):
         #if (part, run) not in [(3,1), (4,3), ]:

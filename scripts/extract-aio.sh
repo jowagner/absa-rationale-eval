@@ -65,11 +65,12 @@ done ; done ; done
 
 # (3) saliency based on LIME scores
 
-LOGNAMEPREFIX=lime-score-p1-verbose
+LOGNAMEPREFIX=lime-score-p2-verbose
 
 for I in c-f-?-? ; do
     echo LIME $I
     scripts/lime-scores-to-aio.py  \
         --workdir $I                \
-        --prefix  $LOGNAMEPREFIX
+        --prefix  $LOGNAMEPREFIX &
 done
+wait

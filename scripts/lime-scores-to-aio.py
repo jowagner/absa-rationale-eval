@@ -8,6 +8,7 @@
 
 # Author: Joachim Wagner
 
+import hashlib
 import os
 import sys
 
@@ -92,11 +93,11 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
             ('S', support_for_predicted_class),
             ('X', maximum_of_absolute_scores),
         ]:
-            for threshold in opt_thresholds:
-                prefix = '%(set_name)s-%(domain)s-%(rationale_code)s%02d' %locals()
+            for rel_length in opt_r_lengths:
+                prefix = '%(set_name)s-%(domain)s-%(rationale_code)s%(rel_length)02d' %locals()
                 prefix_path = os.path.join(opt_workdir, prefix)
                 aio_file = open(prefix_path + '.aio', 'wt')
-                if opt_wordcloud == threshold:
+                if opt_wordcloud == rel_length:
                     wcloud_file = open(prefix_path + '-wcloud.tsv', 'wt')
                 else:
                     wcloud_file = None
@@ -104,14 +105,17 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                 score_filename = '%(opt_prefix)s-%(set_code)s.out' %locals()
                 score_file = open(os.path.join(opt_workdir, score_filename), 'rt')
 
+                item_index = 0
                 while True:
                     line = score_file.readline()
                     if not line:
                         break
-                    if line.isspace():
+                    if line.isspace() or line.startswith('#'):
                         continue
                     if not line.startswith('== item index'):
                         raise ValueError('unexpected line in %s: %r' %(score_filename, line))
+                    # check item index
+                    assert int(line.split()[3]) == item_index
                     # read item header
                     line = score_file.readline()
                     assert line.isspace()
@@ -124,11 +128,14 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                         assert line
                         if line.isspace():
                             break
-                        if line.startwith('tokens '):
+                        #sys.stderr.write('item %d header line %r\n' %(item_index, line))
+                        if line.startswith('tokens '):
                             tokens = line[7:].split()
-                        if line.startwith('domain '):
+                        elif line.startswith('domain '):
                             item_domain = line[7:].rstrip()
-                        if line.startwith('sea '):
+                        elif line.startswith('opinion_id '):
+                            opinion_id = line[11:].rstrip()
+                        elif line.startswith('sea '):
                             sea = line[4:].split()
                     assert tokens
                     assert item_domain
@@ -161,13 +168,15 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                                     break
                                 assert line.startswith('(')
                         elif line.startswith('Scores:'):
-                            assert prediction
+                            if not prediction:
+                                raise ValueError('missing prediction in %s/%s item %d' %(opt_workdir, score_filename, item_index))
                             assert probs
                             t_index = 0
                             while True:
                                 line = score_file.readline()
                                 if not line or line.isspace():
                                     break
+				#sys.stderr.write('item %d token %d: %r\n' %(item_index, t_index, line))
                                 fields = line.split()
                                 assert len(fields) >= 4
                                 assert int(fields[0]) == t_index
@@ -176,6 +185,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                                     float(fields[2]),
                                     float(fields[3]),
                                 ))
+                                t_index += 1
                         else:
                             raise ValueError('unexpected line in %s (2): %r' %(score_filename, line))
                         if scores:
@@ -185,12 +195,13 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                     if item_domain != domain:
                         # skip items with different domain than we are
                         # looking for in this iteration
+                        item_index += 1
                         continue
                     # get saliency scores from LIME scores and prediction
                     p_index = opt_classes.index(prediction)
                     saliency_scores = []
                     for index in range(len(scores)):
-                        score = score_func(scores, probs, p_index)
+                        score = score_func(scores[index], probs, p_index)
                         tiebreaker = '%s:%s:%s:%d' %(
                             set_name, domain, opinion_id, index
                         )
@@ -200,7 +211,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                         saliency_scores.append((score, tiebreaker, index))
                     # optionally normalise scores
                     if opt_normalise:
-                        total = sum(saliency_scores)
+                        total = sum(map(lambda x: x[0], saliency_scores))
                         new_scores = []
                         for index in range(len(scores)):
                             score, tiebreaker, index = saliency_scores[index]
@@ -228,10 +239,20 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                             row.append(token)
                             row.append(tag)
                             row.append(sea[t_index])
+                            #for _, score_func2 in [
+                            #    ('M', abs_score_of_predicted_class),
+                            #    ('N', scaled_score_of_predicted_class),
+                            #    ('S', support_for_predicted_class),
+                            #    ('X', maximum_of_absolute_scores),
+                            #]:
+                            #    row.append('%.9f' %score_func2(scores[t_index], probs, p_index))
+                            #sys.stderr.write('item %d token %d wc: %r\n' %(item_index, t_index, row))
                             wcloud_file.write('\t'.join(row))
+                            wcloud_file.write('\n')
                     aio_file.write('\n')
                     if wcloud_file is not None:
                         wcloud_file.write('\n')
+                    item_index += 1
 
                 aio_file.close()
                 score_file.close()
