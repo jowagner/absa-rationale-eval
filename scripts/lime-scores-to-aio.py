@@ -67,6 +67,9 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
 def abs_score_of_predicted_class(scores, probs, pred_index):
     return abs(scores[pred_index])
 
+def scaled_score_of_predicted_class(scores, probs, pred_index):
+    return 0.5 + 0.5 * scores[pred_index]
+
 def support_for_predicted_class(scores, probs, pred_index):
     score_1 = scores[pred_index]
     scores = [scores[0], scores[1], scores[2]] # deep copy and ensure it can be modified
@@ -85,6 +88,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
     for domain in opt_domains:
         for rationale_code, score_func in [
             ('M', abs_score_of_predicted_class),
+            ('N', scaled_score_of_predicted_class),
             ('S', support_for_predicted_class),
             ('X', maximum_of_absolute_scores),
         ]:
