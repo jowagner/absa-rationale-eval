@@ -108,7 +108,7 @@ for RUN in 1 2 3 ; do
         for D in laptop restaurant ; do
             for T in train test ; do
 """ %locals())
-                if aio_name[0] in 'LMPSX':
+                if aio_name[0] in 'LMNPSX':
                     f.write("""
                 cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio $LAIODIR/${T}.${D}.aio
 """ %locals())
