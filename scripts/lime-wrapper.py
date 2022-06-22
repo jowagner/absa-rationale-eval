@@ -33,6 +33,7 @@ task_dir = 'tasks'
 num_samples = 10000
 mask_string = '[MASK]'
 opt_verbose = False
+opt_abort_on_cache_miss = False
 
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
@@ -42,6 +43,8 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         sys.exit(0)
     elif option == '--verbose':
         opt_verbose = True
+    elif option == '--opt-abort-on-cache-miss':
+        opt_abort_on_cache_miss = True
     elif option in ('--train', '--for-training-set'):
         dataset_index = 0
     elif option in ('--test', '--for-test-set'):
@@ -284,6 +287,9 @@ def my_predict_proba(items):
         100.0*cache_miss/float(total),
         100.0*cache_miss/float(after_dedup),
     ))
+    if cache_miss and opt_abort_on_cache_miss:
+        print('# aborting as --abort-on-cache-miss was specified')
+        sys.exit(1)
     # get missing predictions
     mask2triplet = get_missing_predictions(new)
     # assemble probability triplets
