@@ -70,14 +70,14 @@ while True:
             m_type = 'tab2-SE'
         elif 'with-union-aio' in filename:
             m_type = 'tab2-U-SE'
-        elif filename.startswith('stdout-training-with-L'):
-            fields = filename.replace('-', ' ').split()
-            aio_name = fields[3].replace('.', ' ').split()[0]
-            m_type = 'tab3-' + aio_name
         elif filename.startswith('stdout-training-with-RND'):
             fields = filename.replace('-', ' ').split()
             aio_name = fields[3].replace('.', ' ').split()[0]
             m_type = 'tab4-' + aio_name
+        elif filename.startswith('stdout-training-with-'):
+            fields = filename.replace('-', ' ').split()
+            aio_name = fields[3].replace('.', ' ').split()[0]
+            m_type = 'tab3-' + aio_name
         elif filename == 'stdout-training-with-local-aio.txt':
             m_type = 'tab5-old-R'
         else:
@@ -177,13 +177,21 @@ for domain, maj_acc, baseline_acc in [
         ('tab2-SE',   'SE'),
         ('tab2-U-SE', 'U-SE'),
         (None, None),            # = hline separator
-        ('tab3-L25',  'R@.25'),
-        ('tab3-L50',  'R@.5'),
-        ('tab3-L75',  'R@.75'),
+        ('tab3-L25',  'R\\subscript{IG}@.25'),
+        ('tab3-L50',  'R\\subscript{IG}@.5'),
+        ('tab3-L75',  'R\\subscript{IG}@.75'),
         (None, None),            # = hline separator
-        ('tab4-RND25',  'A@.25'),
-        ('tab4-RND50',  'A@.5'),
-        ('tab4-RND75',  'A@.75'),
+        ('tab3-P25',  'R\\subscript{APG}@.25'),
+        ('tab3-P50',  'R\\subscript{APG}@.5'),
+        ('tab3-P75',  'R\\subscript{APG}@.75'),
+        (None, None),            # = hline separator
+        ('tab3-N25',  'R\\subscript{LIME}@.25'),
+        ('tab3-N50',  'R\\subscript{LIME}@.5'),
+        ('tab3-N75',  'R\\subscript{LIME}@.75'),
+        (None, None),            # = hline separator
+        ('tab4-RND25',  'R\\subscript{RAND}@.25'),
+        ('tab4-RND50',  'R\\subscript{RAND}@.5'),
+        ('tab4-RND75',  'R\\subscript{RAND}@.75'),
         (None, None),            # = hline separator
     ]:
         f.write('    ')
@@ -229,12 +237,18 @@ f.close()
 for m_type, mask_filename, mask_title in [
     ('tab2-SE',    '0SE',   'SE'),
     ('tab2-U-SE',  '0U-SE', 'U-SE'),
-    ('tab3-L25',   'L25',   'R@.25'),
-    ('tab3-L50',   'L50',   'R@.5'),
-    ('tab3-L75',   'L75',   'R@.75'),
-    ('tab4-RND25', 'RND25', 'A@.25'),
-    ('tab4-RND50', 'RND50', 'A@.5'),
-    ('tab4-RND75', 'RND75', 'A@.75'),
+    ('tab3-L25',   'L25',   'R\\subscript{IG}@.25'),
+    ('tab3-L50',   'L50',   'R\\subscript{IG}@.5'),
+    ('tab3-L75',   'L75',   'R\\subscript{IG}@.75'),
+    ('tab3-P25',   'P25',   'R\\subscript{APG}@.25'),
+    ('tab3-P50',   'P50',   'R\\subscript{APG}@.5'),
+    ('tab3-P75',   'P75',   'R\\subscript{APG}@.75'),
+    ('tab3-N25',   'N25',   'R\\subscript{LIME}@.25'),
+    ('tab3-N50',   'N50',   'R\\subscript{LIME}@.5'),
+    ('tab3-N75',   'N75',   'R\\subscript{LIME}@.75'),
+    ('tab4-RND25', 'RND25', 'R\\subscript{RAND}@.25'),
+    ('tab4-RND50', 'RND50', 'R\\subscript{RAND}@.5'),
+    ('tab4-RND75', 'RND75', 'R\\subscript{RAND}@.75'),
 ]:
     f = open('results-masking-%s.tex' %mask_filename, 'wt')
     f.write(r"""%% Table with %(mask_title)s masking results
