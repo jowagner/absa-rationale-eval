@@ -120,7 +120,7 @@ f = open('results-masking-diagonal.tex', 'wt')
 f.write(r"""% Table with masking results, diagonal of results from Appendix
 
 \begin{table}
-    %\small
+    \small
     \centering
     \begin{tabular}{l|rr}
     %\hline
@@ -164,34 +164,31 @@ for domain, maj_acc, baseline_acc in [
         f.write(r"""    \multicolumn{3}{l}{} \\
 """)
     is_first = False
-    f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
-    \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
-    \hline
-""" %locals())
-    f.write(r'    \textbf{Full}        & %s & \textbf{None}        & %s \\' %(
-        get_cell_content('tab2-SE', 'tr=Full', domain, 'Full'),
-        get_cell_content('tab2-SE', 'tr=None', domain, 'None'),
-    ))
+    f.write(r'    \textbf{Full}                      & ')
+    f.write(get_cell_content('tab2-SE', 'tr=Full', domain, 'Full'))
+    f.write(r' & \textbf{None}                            & ')
+    f.write(get_cell_content('tab2-SE', 'tr=None', domain, 'None'))
+    f.write(r' \\')
     f.write('\n')
     for m_type, mask_title_left in [
         ('tab2-SE',   'SE'),
         ('tab2-U-SE', 'U-SE'),
         (None, None),            # = hline separator
-        ('tab3-L25',  'R\\subscript{IG}@.25'),
-        ('tab3-L50',  'R\\subscript{IG}@.5'),
-        ('tab3-L75',  'R\\subscript{IG}@.75'),
+        ('tab3-L25',  'R\\textsubscript{IG}@.25'),
+        ('tab3-L50',  'R\\textsubscript{IG}@.5'),
+        ('tab3-L75',  'R\\textsubscript{IG}@.75'),
         (None, None),            # = hline separator
-        ('tab3-P25',  'R\\subscript{APG}@.25'),
-        ('tab3-P50',  'R\\subscript{APG}@.5'),
-        ('tab3-P75',  'R\\subscript{APG}@.75'),
+        ('tab3-P25',  'R\\textsubscript{APG}@.25'),
+        ('tab3-P50',  'R\\textsubscript{APG}@.5'),
+        ('tab3-P75',  'R\\textsubscript{APG}@.75'),
         (None, None),            # = hline separator
-        ('tab3-N25',  'R\\subscript{LIME}@.25'),
-        ('tab3-N50',  'R\\subscript{LIME}@.5'),
-        ('tab3-N75',  'R\\subscript{LIME}@.75'),
+        ('tab3-N25',  'R\\textsubscript{LIME}@.25'),
+        ('tab3-N50',  'R\\textsubscript{LIME}@.5'),
+        ('tab3-N75',  'R\\textsubscript{LIME}@.75'),
         (None, None),            # = hline separator
-        ('tab4-RND25',  'R\\subscript{RAND}@.25'),
-        ('tab4-RND50',  'R\\subscript{RAND}@.5'),
-        ('tab4-RND75',  'R\\subscript{RAND}@.75'),
+        ('tab4-RND25',  'R\\textsubscript{RAND}@.25'),
+        ('tab4-RND50',  'R\\textsubscript{RAND}@.5'),
+        ('tab4-RND75',  'R\\textsubscript{RAND}@.75'),
         (None, None),            # = hline separator
     ]:
         f.write('    ')
@@ -204,23 +201,32 @@ for domain, maj_acc, baseline_acc in [
             (False, 'tr=Y_Other', 'Z-CompSE/R', '$\\neg$' + mask_title_left),
         ]:
             if not is_first_column:
+                col_width = 32
                 f.write('& ')
-            gap = (12 - len(mask_title)) * ' '
+            else:
+                col_width = 26
+            gap = (col_width - len(mask_title)) * ' '
             f.write(r'\textbf{%s}%s' %(mask_title, gap))
             f.write(r'& %s ' %get_cell_content(m_type, tr, domain, te))
         f.write(r'\\')
         f.write('\n')
+    f.write(r"""    \multicolumn{3}{l}{Test set: %(domain)s} \\
+    \multicolumn{3}{l}{Majority baseline: %(maj_acc).1f} \\
+    \hline
+""" %locals())
 f.write(r"""    \end{tabular}
-    \caption{Test set accuracy (x100, average and standard deviation over nine runs)
-             and effect of restricting input to sentiment expressions (SE),
+    \caption{Test set accuracy (x100, average and standard deviation over twelve runs)
+             and effect of restricting input to SEs,
              the union of all SEs where a sentence has multiple opinions (U-SE),
-             rationales (R), random tokens (A) and
-             masking all other tokens ($\neg$SE, $\neg$R and $\neg$A)
+             rationales based on integrated gradients (R\textsubscript{IG}),
+             rationales based on absolute point gradients (R\textsubscript{APG}),
+             rationales based on LIME scores (R\textsubscript{LIME}),
+             random tokens (R\textsubscript{RAND}) and
+             masking all other tokens ($\neg$)
              for 25\%, 50\% and 75\% lengths.
-             ``None'' masks the review sentence completely. Only the
-             review domain, aspect entity type, aspect attribute and sentence
-             length (via the number of ``[MASK]'' tokens) are available to
-             the classifier in this setting.}
+             ``None'' masks the review sentence completely.
+             The review domain, aspect entity type, aspect attribute
+             and sentence length are available to all classifiers.}
     \label{tab:masking:rationales-diagonal}
 \end{table}
 % eof
@@ -237,18 +243,18 @@ f.close()
 for m_type, mask_filename, mask_title in [
     ('tab2-SE',    '0SE',   'SE'),
     ('tab2-U-SE',  '0U-SE', 'U-SE'),
-    ('tab3-L25',   'L25',   'R\\subscript{IG}@.25'),
-    ('tab3-L50',   'L50',   'R\\subscript{IG}@.5'),
-    ('tab3-L75',   'L75',   'R\\subscript{IG}@.75'),
-    ('tab3-P25',   'P25',   'R\\subscript{APG}@.25'),
-    ('tab3-P50',   'P50',   'R\\subscript{APG}@.5'),
-    ('tab3-P75',   'P75',   'R\\subscript{APG}@.75'),
-    ('tab3-N25',   'N25',   'R\\subscript{LIME}@.25'),
-    ('tab3-N50',   'N50',   'R\\subscript{LIME}@.5'),
-    ('tab3-N75',   'N75',   'R\\subscript{LIME}@.75'),
-    ('tab4-RND25', 'RND25', 'R\\subscript{RAND}@.25'),
-    ('tab4-RND50', 'RND50', 'R\\subscript{RAND}@.5'),
-    ('tab4-RND75', 'RND75', 'R\\subscript{RAND}@.75'),
+    ('tab3-L25',   'L25',   'R\\textsubscript{IG}@.25'),
+    ('tab3-L50',   'L50',   'R\\textsubscript{IG}@.5'),
+    ('tab3-L75',   'L75',   'R\\textsubscript{IG}@.75'),
+    ('tab3-P25',   'P25',   'R\\textsubscript{APG}@.25'),
+    ('tab3-P50',   'P50',   'R\\textsubscript{APG}@.5'),
+    ('tab3-P75',   'P75',   'R\\textsubscript{APG}@.75'),
+    ('tab3-N25',   'N25',   'R\\textsubscript{LIME}@.25'),
+    ('tab3-N50',   'N50',   'R\\textsubscript{LIME}@.5'),
+    ('tab3-N75',   'N75',   'R\\textsubscript{LIME}@.75'),
+    ('tab4-RND25', 'RND25', 'R\\textsubscript{RAND}@.25'),
+    ('tab4-RND50', 'RND50', 'R\\textsubscript{RAND}@.5'),
+    ('tab4-RND75', 'RND75', 'R\\textsubscript{RAND}@.75'),
 ]:
     f = open('results-masking-%s.tex' %mask_filename, 'wt')
     f.write(r"""%% Table with %(mask_title)s masking results
@@ -288,7 +294,7 @@ for m_type, mask_filename, mask_title in [
             ('tr=Y_Other', '$\\neg$' + mask_title),
             ('tr=Z_Concat', 'Concat'),
         ]:
-            gap = (11 - len(tr_title)) * ' '
+            gap = (25 - len(tr_title)) * ' '
             f.write(r'    \textbf{%s}%s' %(tr_title, gap))
             for te in [
                 'Full',
