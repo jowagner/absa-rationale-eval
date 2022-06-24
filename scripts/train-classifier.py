@@ -2042,6 +2042,7 @@ for batch in get_batches_for_saliency(best_model):
         ))
         print()
         # get evaluation metrics for every possible rationale length
+        # TODO: use evaluation.get_confusion_matrices()
         rationale = set()
         length2confusions = {}
         length2confusions[0] = evaluation.get_confusion_matrix(
@@ -2052,7 +2053,7 @@ for batch in get_batches_for_saliency(best_model):
         best_lengths = []
         best_lengths.append(0)
         best_fscore = evaluation.get_fscore(length2confusions[0])
-        for score, index in scores:
+        for _, index in scores:
             # add token to rationale
             rationale.add(get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index))
             length = len(rationale)
@@ -2088,9 +2089,9 @@ for batch in get_batches_for_saliency(best_model):
         for n_thresholds, summary_key in thresholds_and_summary_keys:
             if summary_key in summaries:
                 continue
-            summaries[summary_key] = {}
+            summaries[summary_key] = {}  # TODO: replace with evaluation.FscoreSummaryTable()
             summary = summaries[summary_key]
-            for threshold in range(n_thresholds):   # TODO: replace with evaluation.FscoreSummaryTable()
+            for threshold in range(n_thresholds):
                 d = []
                 for _ in range(4):
                     d.append(0)
@@ -2105,6 +2106,7 @@ for batch in get_batches_for_saliency(best_model):
         length_oracle_summary = summaries[length_oracle_summary_key]
         data = []
         # print and collect stats for every possible rationale length
+        # TODO: use evalution.get_and_print_stats()
         print('\t'.join("""RationaleLength Percentage True-Negatives False-Positives False-Negatives
         True-Positives Precision Recall F-Score Accuracy""".split()))
         for length, length2 in enumerate(sorted(list(length2confusions.keys()))):
@@ -2155,6 +2157,7 @@ for batch in get_batches_for_saliency(best_model):
                 summaries_updated_in_batch.add(length_oracle_summary_key)
         # update summary stats for thresholds in steps of 0.001
         # (using integer operations to avoid numerical issues)
+        # TODO: use evaluation.FscoreSummaryTable.update()
         for threshold in range(1001):
             d = summary[threshold]
             r_length = (len(sea) * threshold + 500) // 1000
