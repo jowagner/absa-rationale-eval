@@ -12,6 +12,8 @@ import hashlib
 import os
 import sys
 
+import evaluation
+
 def usage():
     print('Usage: $0 [options]')
     # TODO: print more details how to use this script
@@ -25,6 +27,8 @@ opt_r_lengths  = [25, 50, 75]
 opt_wordcloud  = 50
 opt_normalise  = False   # should have no effect on rationales as it does not change the ranking
 opt_classes    = 'negative neutral positive'.split()
+data_prefix    = 'data/'
+opt_write_fscores = True
 
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
@@ -55,6 +59,8 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         del sys.argv[1]
     elif option == '--normalise':
         opt_normalise = True
+    elif option == '--no-fscores':
+        opt_write_fscores = None
     elif option == '--no-wordcloud':
         opt_wordcloud = None
     elif option == '--wordcloud-length':
@@ -64,6 +70,12 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         print('Unknown option', option)
         usage()
         sys.exit(1)
+
+if opt_wordcloud is not None:
+    assert opt_wordcloud in opt_r_lengths
+
+if opt_write_fscores and not opt_r_lengths:
+    opt_r_lengths.append(None)
 
 def abs_score_of_predicted_class(scores, probs, pred_index):
     return abs(scores[pred_index])
@@ -85,6 +97,8 @@ def maximum_of_absolute_scores(scores, probs, pred_index):
         abs(scores[2])
     )
 
+function_words = evaluation.init_function_words(data_prefix)
+
 for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'training'
     for domain in opt_domains:
         for rationale_code, score_func in [
@@ -93,14 +107,21 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
             ('S', support_for_predicted_class),
             ('X', maximum_of_absolute_scores),
         ]:
-            for rel_length in opt_r_lengths:
+            for rl_index, rel_length in enumerate(opt_r_lengths):
                 prefix = '%(set_name)s-%(domain)s-%(rationale_code)s%(rel_length)02d' %locals()
                 prefix_path = os.path.join(opt_workdir, prefix)
-                aio_file = open(prefix_path + '.aio', 'wt')
-                if opt_wordcloud == rel_length:
+                if rel_length is not None:
+                    aio_file = open(prefix_path + '.aio', 'wt')
+                else:
+                    aio_file = None
+                if opt_wordcloud is not None and opt_wordcloud == rel_length:
                     wcloud_file = open(prefix_path + '-wcloud.tsv', 'wt')
                 else:
                     wcloud_file = None
+                if opt_write_fscores and rl_index == 0:
+                    summaries   = {}
+                else:
+                    summaries   = None
 
                 score_filename = '%(opt_prefix)s-%(set_code)s.out' %locals()
                 score_file = open(os.path.join(opt_workdir, score_filename), 'rt')
@@ -176,7 +197,6 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                                 line = score_file.readline()
                                 if not line or line.isspace():
                                     break
-				#sys.stderr.write('item %d token %d: %r\n' %(item_index, t_index, line))
                                 fields = line.split()
                                 assert len(fields) >= 4
                                 assert int(fields[0]) == t_index
@@ -192,9 +212,11 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                             break
                     # all information ready for this item
                     assert len(scores) == len(tokens)
-                    if item_domain != domain:
+                    if item_domain != domain \
+                    and not (set_code == 'te' and summaries is not None):
                         # skip items with different domain than we are
                         # looking for in this iteration
+                        # (except test items needed for fscore summaries)
                         item_index += 1
                         continue
                     # get saliency scores from LIME scores and prediction
@@ -229,7 +251,8 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                     # write output
                     for t_index, token in enumerate(tokens):
                         tag = 'I' if t_index in indices else 'O'
-                        aio_file.write('%s\t%s\n' %(token, tag))
+                        if aio_file is not None:
+                            aio_file.write('%s\t%s\n' %(token, tag))
                         if wcloud_file is not None:
                             row = []
                             row.append('%s%02d' %(rationale_code, rel_length))
@@ -249,12 +272,16 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                             #sys.stderr.write('item %d token %d wc: %r\n' %(item_index, t_index, row))
                             wcloud_file.write('\t'.join(row))
                             wcloud_file.write('\n')
-                    aio_file.write('\n')
+                    if aio_file is not None:
+                        aio_file.write('\n')
                     if wcloud_file is not None:
                         wcloud_file.write('\n')
+                    if summaries is not None:
+                        raise NotImplementedError
                     item_index += 1
 
-                aio_file.close()
                 score_file.close()
+                if aio_file is not None:
+                    aio_file.close()
                 if wcloud_file is not None:
                     wcloud_file.close()

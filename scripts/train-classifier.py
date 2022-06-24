@@ -2090,7 +2090,7 @@ for batch in get_batches_for_saliency(best_model):
                 continue
             summaries[summary_key] = {}
             summary = summaries[summary_key]
-            for threshold in range(n_thresholds):
+            for threshold in range(n_thresholds):   # TODO: replace with evaluation.FscoreSummaryTable()
                 d = []
                 for _ in range(4):
                     d.append(0)

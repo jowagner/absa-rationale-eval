@@ -60,6 +60,45 @@ def get_fscore(confusion):
         f = 0.0
     return f
 
+class FscoreSummaryTable:
+
+    def __init__(selfi, n_thresholds = 1001):
+        self.table = {}
+        self.n_thresholds = n_thresholds
+        for threshold in range(n_thresholds):
+            d = []
+            for _ in range(4):
+                d.append(0)
+            for _ in range(12):
+                d.append(0.0)
+            d.append(0)
+            d.append(0)
+            self.table[threshold] = d
+
+    def __getitem__(self, key):
+        return self.table[key]
+
+    def __setitem__(self, key, value):
+        if type(key) == int:
+            raise KeyError('FscoreSummaryTable rejected attempt to overwrite table row')
+        self.table[key] = value
+
+    def update(self, seq_length, data):
+        ''' update summary stats for thresholds in steps of 0.001
+            (using integer operations to avoid numerical issues)
+        '''
+        for threshold in range(1001):
+            d = self[threshold]
+            r_length = (seq_length * threshold + 500) // 1000
+            row = data[r_length]
+            for k in range(8):
+                d[k] += row[k]
+            for k in range(4):
+                d[8+k]  += (row[k] / float(seq_length))
+                d[12+k] += (row[4+k] * float(seq_length))
+            d[16] += seq_length
+            d[17] += 1
+
 def main():
     import sys
     confusion_matrix = map(int, sys.argv[1:5])
