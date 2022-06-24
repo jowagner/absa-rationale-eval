@@ -605,6 +605,8 @@ def get_packages():
         skip_task = False
         if not remaining_attempts:
             print('aborting scan as rejected last %d candidates' %attempts)
+            remaining_attempts = -1
+        if remaining_attempts <= 0:
             skip_task = True
         else:
             remaining_attempts -= 1
@@ -655,6 +657,14 @@ def get_packages():
             emem += memory
             remaining_attempts = attempts  # reset attempts counter
             my_tasks.append(new_task_path)
+        if not te_dataset and entry == candidates[-1][1]:
+            # last entry and no data --> finished
+            assert not my_tasks
+            assert not package_duration
+            assert skip_task             # the last entry has been skipped
+            if remaining_attempts >= 0:  # "aborting scan" has not been printed above
+                print('\nfinished')
+            break
         if entry == candidates[-1][1]  \
         or package_duration > prediction_checkpoint_duration:
             print('\n\nnew package with %d tasks' %len(my_tasks))
@@ -674,7 +684,7 @@ def get_packages():
             eta = now
             emem = base_memory
             my_tasks = []
-            if not remaining_attempts:
+            if remaining_attempts <= 0:  # "aborting scan" has been printed above
                 break
     if tasks_rejected_due_to_age:
         print(tasks_rejected_due_to_age, 'task(s) rejected due to age')
