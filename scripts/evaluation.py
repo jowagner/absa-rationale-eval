@@ -227,6 +227,99 @@ class FscoreSummaryTable:
             d[16] += seq_length
             d[17] += 1
 
+    def print_stats(self, out_file, repeat_header = False):
+        out = out_file
+        header = """From To tn fp fn tp Pr Re F Acc
+        Avg-Pr Avg-Re Avg-F Avg-Acc
+        IW-tn IW-fp IW-fn IW-tp IW-Pr IW-Re IW-F IW-Acc
+        """.split()
+        out.write('\t'.join(header))
+        last_d = None
+        rows_without_header = 0
+        threshold_min = None
+        for threshold in range(1+self.n_thresholds):
+            if repeat_header \
+            and (threshold % 40 == 0) \
+            and 0 < threshold < 1000  \
+            and rows_without_header > 10:
+                print('#'+('\t'.join(header)))
+                rows_without_header = 0
+            if threshold == self.n_thresholds:
+                d = None
+            else:
+                d = self[threshold]
+            if d != last_d:
+                if last_d:
+                    assert threshold_min is not None
+                    row = []
+                    row.append('%5.1f' % (threshold_min/10.0)) # from
+                    row.append('%5.1f' % ((threshold-1)/10.0)) # to
+                    for k in range(4):
+                        row.append('%d' %(last_d[k]))  # totals of tn, fp, etc.
+                    # derived metrics: precision, recall, f-score and accuracy
+                    tn, fp, fn, tp = last_d[:4]
+                    try:
+                        p = tp / float(tp+fp)
+                    except ZeroDivisionError:
+                        p = 1.0
+                    try:
+                        r = tp / float(tp+fn)
+                    except ZeroDivisionError:
+                        r = 1.0
+                    try:
+                        f = 2.0 * p * r / (p+r)
+                    except ZeroDivisionError:
+                        f = 0.0
+                    try:
+                        a = (tp+tn)/float(tn+fp+fn+tp)
+                    except ZeroDivisionError:
+                        a = 1.0
+                    row.append('%14.9f' %(100.0*p))
+                    row.append('%14.9f' %(100.0*r))
+                    row.append('%14.9f' %(100.0*f))
+                    row.append('%14.9f' %(100.0*a))
+                    # average P, R, F, A
+                    row.append('%14.9f' %(100.0*last_d[4]/float(last_d[17])))
+                    row.append('%14.9f' %(100.0*last_d[5]/float(last_d[17])))
+                    row.append('%14.9f' %(100.0*last_d[6]/float(last_d[17])))
+                    row.append('%14.9f' %(100.0*last_d[7]/float(last_d[17])))
+                    # inversely weighted stats
+                    for k in range(8,12):
+                        row.append('%.6f' %(last_d[k]))  # totals of inversly weighted tn, fp, etc.
+                    tn, fp, fn, tp = last_d[8:12]
+                    try:
+                        p = tp / float(tp+fp)
+                    except ZeroDivisionError:
+                        p = 1.0
+                    try:
+                        r = tp / float(tp+fn)
+                    except ZeroDivisionError:
+                        r = 1.0
+                    try:
+                        f = 2.0 * p * r / (p+r)
+                    except ZeroDivisionError:
+                        f = 0.0
+                    try:
+                        a = (tp+tn)/float(tn+fp+fn+tp)
+                    except ZeroDivisionError:
+                        a = 1.0
+                    row.append('%14.9f' %(100.0*p))
+                    row.append('%14.9f' %(100.0*r))
+                    row.append('%14.9f' %(100.0*f))
+                    row.append('%14.9f' %(100.0*a))
+                    out.write('\t'.join(row))
+                    out.write('\n')
+                    rows_without_header += 1
+                last_d = d
+                if d:
+                    threshold_min = threshold
+                else:
+                    threshold_min = None
+        if repeat_header:
+            out.write('\t'.join(header))
+            out.write('\n')
+
+
 
 def main():
     import sys

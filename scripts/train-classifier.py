@@ -2179,6 +2179,7 @@ for batch in get_batches_for_saliency(best_model):
             print('\n\n=== Updated summary for %r ==\n' %(summary_key,))
         else:
             print('\n\n=== Final summary for %r ==\n' %(summary_key,))
+        # TODO: use evaluation.FscoreSummaryTable.print_stats()
         print('For %d of %d test items' %(summary[0][17], summary['set_size_per_mask']))
         header = """From To tn fp fn tp Pr Re F Acc
         Avg-Pr Avg-Re Avg-F Avg-Acc

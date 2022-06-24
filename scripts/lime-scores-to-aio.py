@@ -132,6 +132,8 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                 summaries    = None
                 summary_file = None
 
+            cross_domain_item_count = 0
+
             for domain in opt_domains:
                 prefix = '%(set_name)s-%(domain)s-%(rationale_code)s%(rel_length)02d' %locals()
                 prefix_path = os.path.join(opt_workdir, prefix)
@@ -335,6 +337,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                         summary.update(len(tokens), data)
 
                     item_index += 1
+                    cross_domain_item_count += 1
 
                 score_file.close()
                 if aio_file is not None:
@@ -343,7 +346,12 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                     wcloud_file.close()
 
             if summaries is not None:
-                raise NotImplementedError
+                for summary_key in summaries:
+                    summary = summaries[summary_key]
+                    summary_file.write('\n\n=== Final summary for %r ==\n\n' %(summary_key,))
+                    summary_file.write('For %d of %d test items\n\n' %(summary[0][17], cross_domain_item_count))
+                    summary.print_stats(summary_file)
 
             if summary_file is not None:
                 summary_file.close()
+
