@@ -18,6 +18,8 @@ import sys
 import time
 import torch
 
+import evaluation
+
 def usage():
     print('Usage: $0 [options] <SEED> <COMMAND> <MASK>')
     # TODO: print more details how to use this script
@@ -1856,26 +1858,6 @@ if best_model.tokenizer is None:
     #print('setting tokeniser')
     best_model.tokenizer = tokeniser
 
-def get_confusion_matrix(sea, rationale, raw_tokens):
-    global function_words
-    tn, fp, fn, tp = 0, 0, 0, 0
-    for index, annotation in enumerate(sea):
-        if exclude_function_words \
-        and raw_tokens[index].lower() in function_words:
-            # exclude this token from the evaluation
-            continue
-        if annotation == 'I' and index in rationale:
-            tp += 1
-        elif annotation == 'I':
-            fn += 1
-        elif annotation == 'O' and index in rationale:
-            fp += 1
-        elif annotation == 'O':
-            tn += 1
-        else:
-            raise ValueError('Unsupported SEA annotation %r at index %d' %(annotation, index))
-    return tn, fp, fn, tp
-
 
 def get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index):
     assert start_seqB <= index < end_seqB
@@ -1885,13 +1867,9 @@ def get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index):
     assert word_id_0 is not None
     return word_id_q - word_id_0
 
-function_words = set()
-with open(data_prefix + 'function-words.txt', 'rt') as f:
-    while True:
-        line = f.readline()
-        if not line:
-            break
-        function_words.add(line.split()[0])
+
+function_words = evaluation.init_function_words(data_prefix)
+
 
 example = """
 Subword units: [CLS] laptop : what do you think of the design _ features of laptop ? [SEP] it ' s so nice to look at and the keys are easy to type with . [SEP]
@@ -1946,22 +1924,6 @@ def print_example_rationales(rationale, raw_tokens, batch_item, sea):
                 row.append(sea[t_index])  # also print SEA for comparison
                 print('\t'.join(row))
             print()
-
-def get_fscore(confusion):
-    tn, fp, fn, tp = confusion
-    try:
-        p = tp / float(tp+fp)
-    except ZeroDivisionError:
-        p = 1.0
-    try:
-        r = tp / float(tp+fn)
-    except ZeroDivisionError:
-        r = 1.0
-    try:
-        f = 2.0 * p * r / (p+r)
-    except ZeroDivisionError:
-        f = 0.0
-    return f
 
 print('Gradient method:', opt_gradient_method, 'with alphas', get_alphas(opt_gradient_method))
 
@@ -2082,11 +2044,14 @@ for batch in get_batches_for_saliency(best_model):
         # get evaluation metrics for every possible rationale length
         rationale = set()
         length2confusions = {}
-        length2confusions[0] = get_confusion_matrix(sea, rationale, raw_tokens)
+        length2confusions[0] = evaluation.get_confusion_matrix(
+            sea, rationale, raw_tokens,
+            exclude_function_words,
+        )
         print_example_rationales(rationale, raw_tokens, batch_item, sea)
         best_lengths = []
         best_lengths.append(0)
-        best_fscore = get_fscore(length2confusions[0])
+        best_fscore = evaluation.get_fscore(length2confusions[0])
         for score, index in scores:
             # add token to rationale
             rationale.add(get_token_index_for_subword_index(word_ids, start_seqB, end_seqB, index))
@@ -2094,11 +2059,14 @@ for batch in get_batches_for_saliency(best_model):
             if length not in length2confusions:
                 # found a new rationale
                 # --> get confusion matrix for this rationale
-                length2confusions[length] = get_confusion_matrix(sea, rationale, raw_tokens)
+                length2confusions[length] = evaluation.get_confusion_matrix(
+                    sea, rationale, raw_tokens,
+                    exclude_function_words,
+                )
                 # print example tables for selected lengths
                 print_example_rationales(rationale, raw_tokens, batch_item, sea)
                 # track lengths with best f-score
-                f_score = get_fscore(length2confusions[length])
+                f_score = evaluation.get_fscore(length2confusions[length])
                 if f_score > best_fscore:
                     best_lengths = []
                     best_lengths.append(length)
