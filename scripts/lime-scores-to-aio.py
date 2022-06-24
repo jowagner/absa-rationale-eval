@@ -29,6 +29,7 @@ opt_normalise  = False   # should have no effect on rationales as it does not ch
 opt_classes    = 'negative neutral positive'.split()
 data_prefix    = 'data/'
 opt_write_fscores = True
+opt_exclude_function_words = True
 
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
@@ -59,6 +60,8 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         del sys.argv[1]
     elif option == '--normalise':
         opt_normalise = True
+    elif option == '--fscore-with-function-words':
+        opt_exclude_function_words = False
     elif option == '--no-fscores':
         opt_write_fscores = None
     elif option == '--no-wordcloud':
@@ -116,17 +119,17 @@ function_words = evaluation.init_function_words(data_prefix)
 
 for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'training'
     for rationale_code, score_func in [
-        ('M', abs_score_of_predicted_class),
+        #('M', abs_score_of_predicted_class),
         ('N', scaled_score_of_predicted_class),
-        ('S', support_for_predicted_class),
-        ('X', maximum_of_absolute_scores),
+        #('S', support_for_predicted_class),
+        #('X', maximum_of_absolute_scores),
     ]:
         for rl_index, rel_length in enumerate(opt_r_lengths):
             if opt_write_fscores \
             and rl_index == 0    \
             and set_code == 'te':
                 summaries = {}
-                path = '%s(opt_workdir)s/lime-%(rationale_code)s-fscores-%(set_code)s.txt' %locals()
+                path = '%(opt_workdir)s/lime-%(rationale_code)s-fscores-%(set_code)s.txt' %locals()
                 summary_file = open(path, 'wt')
             else:
                 summaries    = None
@@ -270,7 +273,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                     r_length = (50 + len(tokens) * rel_length) // 100
                     # get rationale indices
                     saliency_scores.sort(reverse = True)
-                    all_indices = map(lambda x: x[-1], saliency_scores)
+                    all_indices = list(map(lambda x: x[-1], saliency_scores))
                     indices = set(all_indices[:r_length])
                     # write output
                     for t_index, token in enumerate(tokens):
@@ -301,9 +304,9 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                     if wcloud_file is not None:
                         wcloud_file.write('\n')
                     if summaries is not None:
-                        print('\n\n=== Item ===\n')
+                        summary_file.write('\n\n=== Item ===\n\n')
                         # get confusion matrices for each rationale length
-                        length2confusions, best_length = get_confusion_matrices(
+                        length2confusions, best_length = evaluation.get_confusion_matrices(
                             sea, all_indices, tokens,
                             excl_function_words = opt_exclude_function_words,
                             out_file = summary_file,
@@ -330,6 +333,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                             length_oracle_summary      = length_oracle_summary,
                             length_oracle_summary_key  = length_oracle_summary_key,
                             summaries_updated_in_batch = None,
+                            seq_length = len(tokens),
                             out_file = summary_file,
                         )
                         assert len(data) == len(length2confusions)

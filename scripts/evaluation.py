@@ -75,11 +75,9 @@ def get_confusion_matrices(
     assert len(r_indices) == len(sea)
     if subword_info:
         assert subword_to_token is not None
-    if not subword_indices:
-        subword_indices = range(len(tokens))
     rationale = set()
     length2confusions = {}
-    length2confusions[0] = evaluation.get_confusion_matrix(
+    length2confusions[0] = get_confusion_matrix(
         sea, rationale, tokens,
         excl_function_words,
     )
@@ -87,7 +85,7 @@ def get_confusion_matrices(
         print_example_rationales(rationale, tokens, item_info, sea)
     best_lengths = []
     best_lengths.append(0)
-    best_fscore = evaluation.get_fscore(length2confusions[0])
+    best_fscore = get_fscore(length2confusions[0])
     for index in r_indices:
         if subword_to_token_index:
             index = subword_to_token_index(subword_info, index)
@@ -99,7 +97,7 @@ def get_confusion_matrices(
             # --> get confusion matrix for this rationale
             length2confusions[length] = get_confusion_matrix(
                 sea, rationale, tokens,
-                exclude_function_words,
+                excl_function_words,
             )
             # print example tables for selected lengths
             if print_example_rationales is not None:
@@ -129,6 +127,7 @@ def get_and_print_stats(
     summaries_updated_in_batch = None,
     length_oracle_summary_key  = None,
     item_info = None,
+    seq_length = None,
     out_file = None,
 ):
     ''' print and collect stats for every possible rationale length
@@ -161,7 +160,7 @@ def get_and_print_stats(
         if out_file is not None:
             row = []
             row.append('%4d' %length)
-            row.append('%14.9f' %(100.0*length/float(len(sea))))
+            row.append('%14.9f' %(100.0*length/float(seq_length)))
             row.append('%d' %tn)
             row.append('%d' %fp)
             row.append('%d' %fn)
@@ -175,7 +174,7 @@ def get_and_print_stats(
         row = (tn, fp, fn, tp, p, r, f, a)
         data.append(row)
         if length_oracle_summary and length == best_length:
-            length_oracle_summary.update(len(sea), row, is_row = True)
+            length_oracle_summary.update(seq_length, row, is_row = True)
             if item_info \
             and 'set_size_per_mask' in item_info \
             and 'set_size_per_mask' not in length_oracle_summary:
@@ -187,7 +186,7 @@ def get_and_print_stats(
 
 class FscoreSummaryTable:
 
-    def __init__(selfi, n_thresholds = 1001):
+    def __init__(self, n_thresholds = 1001):
         self.table = {}
         self.n_thresholds = n_thresholds
         for threshold in range(n_thresholds):
@@ -234,6 +233,7 @@ class FscoreSummaryTable:
         IW-tn IW-fp IW-fn IW-tp IW-Pr IW-Re IW-F IW-Acc
         """.split()
         out.write('\t'.join(header))
+        out.write('\n')
         last_d = None
         rows_without_header = 0
         threshold_min = None
@@ -242,7 +242,8 @@ class FscoreSummaryTable:
             and (threshold % 40 == 0) \
             and 0 < threshold < 1000  \
             and rows_without_header > 10:
-                print('#'+('\t'.join(header)))
+                out.write('#'+('\t'.join(header)))
+                out.write('\n')
                 rows_without_header = 0
             if threshold == self.n_thresholds:
                 d = None
