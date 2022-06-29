@@ -43,7 +43,7 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         sys.exit(0)
     elif option == '--verbose':
         opt_verbose = True
-    elif option == '--opt-abort-on-cache-miss':
+    elif option == '--abort-on-cache-miss':
         opt_abort_on_cache_miss = True
     elif option in ('--train', '--for-training-set'):
         dataset_index = 0
