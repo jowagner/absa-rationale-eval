@@ -118,19 +118,34 @@ if opt_write_fscores:
 function_words = evaluation.init_function_words(data_prefix)
 
 for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'training'
-    for rationale_code, score_func in [
-        #('M', abs_score_of_predicted_class),
+    for sf_index, score_func_tuple in emumerate([
+        ('M', abs_score_of_predicted_class),
         ('N', scaled_score_of_predicted_class),
-        #('S', support_for_predicted_class),
-        #('X', maximum_of_absolute_scores),
-    ]:
+        ('S', support_for_predicted_class),
+        ('X', maximum_of_absolute_scores),
+    ]):
+        rationale_code, score_func = score_func_tuple
         for rl_index, rel_length in enumerate(opt_r_lengths):
+            # for test sets we may want to write a f-score summary
+            # (only for the first rationale length as the summary
+            # is independent of the aio file's rationale length)
             if opt_write_fscores \
             and rl_index == 0    \
             and set_code == 'te':
                 summaries = {}
                 path = '%(opt_workdir)s/lime-%(rationale_code)s-fscores-%(set_code)s.txt' %locals()
                 summary_file = open(path, 'wt')
+                # prepare storing cumulative stats for evaluation scores for full data sets
+                thresholds_and_summary_keys = [
+                    (1001, (seed, set_name, rationale_code)),
+                    (1,    ('length oracle', seed, set_name, rationale_code)),
+                ]
+                for n_thresholds, summary_key in thresholds_and_summary_keys:
+                    summaries[summary_key] = evaluation.FscoreSummaryTable()
+                summary_key = thresholds_and_summary_keys[0][1]
+                summary = summaries[summary_key]
+                length_oracle_summary_key = thresholds_and_summary_keys[1][1]
+                length_oracle_summary = summaries[length_oracle_summary_key]
             else:
                 summaries    = None
                 summary_file = None
@@ -138,13 +153,15 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
             cross_domain_item_count = 0
 
             for domain in opt_domains:
-                prefix = '%(set_name)s-%(domain)s-%(rationale_code)s%(rel_length)02d' %locals()
-                prefix_path = os.path.join(opt_workdir, prefix)
                 if rel_length is not None:
+                    prefix = '%(set_name)s-%(domain)s-%(rationale_code)s%(rel_length)02d' %locals()
+                    prefix_path = os.path.join(opt_workdir, prefix)
                     aio_file = open(prefix_path + '.aio', 'wt')
                 else:
                     aio_file = None
-                if opt_wordcloud is not None and opt_wordcloud == rel_length:
+                if rel_length is not None \
+                and opt_wordcloud is not None \
+                and opt_wordcloud == rel_length:
                     wcloud_file = open(prefix_path + '-wcloud.tsv', 'wt')
                 else:
                     wcloud_file = None
@@ -188,7 +205,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                     assert item_domain
                     assert opinion_id
                     assert sea
-                    # read predictions and scores,
+                    # read prediction and scores,
                     # skip comments and explanations
                     prediction = None
                     probs = None
@@ -238,11 +255,9 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                             break
                     # all information ready for this item
                     assert len(scores) == len(tokens)
-                    if item_domain != domain \
-                    and not (set_code == 'te' and summaries is not None):
+                    if item_domain != domain:
                         # skip items with different domain than we are
                         # looking for in this iteration
-                        # (except test items needed for fscore summaries)
                         item_index += 1
                         continue
                     # get saliency scores from LIME scores and prediction
@@ -269,16 +284,21 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                                 index,
                             ))
                         saliency_scores = new_scores
-                    # calculate absolute length for given relative length
-                    r_length = (50 + len(tokens) * rel_length) // 100
-                    # get rationale indices
+                    # get indices in order of saliency scores
                     saliency_scores.sort(reverse = True)
                     all_indices = list(map(lambda x: x[-1], saliency_scores))
-                    indices = set(all_indices[:r_length])
+                    # get indices of rationale
+                    if rel_length is not None:
+                        # calculate absolute length for given relative length
+                        r_length = (50 + len(tokens) * rel_length) // 100
+                        indices = set(all_indices[:r_length])
+                    else:
+                        indices = []   # allow use of `in` below
                     # write output
                     for t_index, token in enumerate(tokens):
                         tag = 'I' if t_index in indices else 'O'
                         if aio_file is not None:
+                            assert type(indices) == set
                             aio_file.write('%s\t%s\n' %(token, tag))
                         if wcloud_file is not None:
                             row = []
@@ -303,8 +323,14 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                         aio_file.write('\n')
                     if wcloud_file is not None:
                         wcloud_file.write('\n')
+                    # update summaries if needed
                     if summaries is not None:
                         summary_file.write('\n\n=== Item ===\n\n')
+                        summary_file.write('domain:\t%s\n' %domain)
+                        summary_file.write('index:\t%d\n' %item_index)
+                        summary_file.write('opinion_id:\t%s\n' %opinion_id)
+                        summary_file.write('tokens:\t%s\n' %(' '.join(tokens)))
+                        summary_file.write('sea:\t%s\n' %(' '.join(sea)))
                         # get confusion matrices for each rationale length
                         length2confusions, best_length = evaluation.get_confusion_matrices(
                             sea, all_indices, tokens,
@@ -312,19 +338,6 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                             out_file = summary_file,
                         )
                         assert len(length2confusions) == len(tokens) + 1
-                        # prepare storing cumulative stats for evaluation scores for full data sets
-                        thresholds_and_summary_keys = [
-                            (1001, (seed, set_name)),
-                            (1,    ('length oracle', seed, set_name)),
-                        ]
-                        for n_thresholds, summary_key in thresholds_and_summary_keys:
-                            if summary_key in summaries:
-                                continue
-                            summaries[summary_key] = evaluation.FscoreSummaryTable()
-                        summary_key = thresholds_and_summary_keys[0][1]
-                        summary = summaries[summary_key]
-                        length_oracle_summary_key = thresholds_and_summary_keys[1][1]
-                        length_oracle_summary = summaries[length_oracle_summary_key]
                         # get evaluation stats such as precision and recall
                         # for each confusion length
                         data = evaluation.get_and_print_stats(
@@ -349,6 +362,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                 if wcloud_file is not None:
                     wcloud_file.close()
 
+            # all domains have been processed
             if summaries is not None:
                 for summary_key in summaries:
                     summary = summaries[summary_key]
