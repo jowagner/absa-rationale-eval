@@ -118,7 +118,7 @@ if opt_write_fscores:
 function_words = evaluation.init_function_words(data_prefix)
 
 for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'training'
-    for sf_index, score_func_tuple in emumerate([
+    for sf_index, score_func_tuple in enumerate([
         ('M', abs_score_of_predicted_class),
         ('N', scaled_score_of_predicted_class),
         ('S', support_for_predicted_class),
