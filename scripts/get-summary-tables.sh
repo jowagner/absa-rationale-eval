@@ -7,4 +7,5 @@ for FOLDER in c-f-?-? ; do
         echo $FOLDER $GRADTYPE
         fgrep "== Final summary for ('" -A 2050 $FOLDER/lime-${LIMECODE}-fscores-te.txt > $FOLDER/final-test-summary-for-R-LIME-${LIMECODE}.txt
     done
+    echo $FOLDER
 done

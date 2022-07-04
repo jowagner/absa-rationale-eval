@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: ascii -*-
 
-# (C) 2021 Dublin City University
+# (C) 2021, 2022 Dublin City University
 # All rights reserved. This material may not be
 # reproduced, displayed, modified or distributed without the express prior
 # written permission of the copyright holder.
@@ -9,6 +9,12 @@
 # Author: Joachim Wagner
 
 import sys
+
+#methods = 'IG PG LIME-N'.split()
+methods = ['LIME-N', ]
+
+n_sets = 4
+runs_per_set = 3
 
 example = """
 === Final summary for ('-', 'q0', 'test', None) ==
@@ -36,11 +42,12 @@ def get_int_x10(s):
 
 data = {}
 
-def read_set(folder, run):
+def read_set(folder, run, method):
     global data
-    f = open('%s/final-test-summary.txt' %folder, 'rt')
+    f = open('%s/final-test-summary-for-R-%s.txt' %(folder, method), 'rt')
     line = f.readline()
-    assert line.startswith('=== Final summary for (')
+    if not line.startswith('=== Final summary for ('):
+        raise ValueError('unexpected start summary for %s, run %d, method %s: %r' %(folder, run, method, line))
     assert 'test' in line
     line = f.readline()
     assert line.isspace()
@@ -70,14 +77,15 @@ def read_set(folder, run):
                     value = float(value)
                 else:
                     value = int(value)
-                key = (run, length, c_header)
+                key = (run, length, c_header, method)
                 data[key] = value
     f.close()
 
-for i in [1,2,3]:
-    for j in [1,2,3]:
-        run = 3*(i-1)+j-1
-        read_set('c-f-%d-%d' %(i,j), run)
+for i in range(n_sets):
+    for j in range(runs_per_set):
+        run = 3*i+j
+        for method in methods:
+            read_set('c-f-%d-%d' %(i+1,j+1), run, method)
 
 # data[(run, length, c_header)] with c_header in 
 # 'tn fp fn tp Pr Re F Acc Avg-Pr Avg-Re Avg-F Avg-Acc IW-tn IW-fp IW-fn IW-tp IW-Pr IW-Re IW-F IW-Acc'.split()
@@ -89,20 +97,21 @@ for p_header, r_header, description in [
     ('Avg-Pr', 'Avg-Re', 'macro-average'),
     ('IW-Pr',  'IW-Re',  'inv-weighted-micro'),
 ]:
-    f = open('PR-%s.tsv' %description, 'wt')
+  for method in methods:
+    f = open('%s-PR-%s.tsv' %(method, description), 'wt')
     for (start, end, extra_offset) in [
         (0, 199, 0),
         (200, 400, 9),
         (401,1000, 18),
     ]:
         for length in range(start, end+1):
-            for run in range(9):
+            for run in range(n_sets*runs_per_set):
                 row = []
-                value = data[(run, length, r_header)]
+                value = data[(run, length, r_header, method)]
                 row.append('%.9f' %value)
                 for _ in range(run+extra_offset):
                     row.append('')
-                value = data[(run, length, p_header)]
+                value = data[(run, length, p_header, method)]
                 row.append('%.9f' %value)
                 f.write('\t'.join(row))
                 f.write('\n')
@@ -116,12 +125,13 @@ for f_header, description in [
     ('Avg-F', 'macro-average'),
     ('IW-F',  'inv-weighted-micro'),
 ]:
-    f = open('FL-%s.tsv' %description, 'wt')
+  for method in methods:
+    f = open('%s-FL-%s.tsv' %(method, description), 'wt')
     for length in range(1001):
         row = []
         row.append('%d' %length)
-        for run in range(9):
-            value = data[(run, length, f_header)]
+        for run in range(n_sets*runs_per_set):
+            value = data[(run, length, f_header, method)]
             row.append('%.9f' %value)
         f.write('\t'.join(row))
         f.write('\n')
