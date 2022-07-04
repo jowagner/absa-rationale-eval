@@ -173,27 +173,46 @@ for domain, maj_acc, baseline_acc in [
     for m_type, mask_title_left in [
         ('tab2-SE',   'SE'),
         ('tab2-U-SE', 'U-SE'),
-        (None, None),            # = hline separator
+        (None, r'\hline'),
         ('tab3-L25',  'R\\textsubscript{IG}@.25'),
         ('tab3-L50',  'R\\textsubscript{IG}@.5'),
         ('tab3-L75',  'R\\textsubscript{IG}@.75'),
-        (None, None),            # = hline separator
+        (None, r'\hline'),
         ('tab3-P25',  'R\\textsubscript{APG}@.25'),
         ('tab3-P50',  'R\\textsubscript{APG}@.5'),
         ('tab3-P75',  'R\\textsubscript{APG}@.75'),
-        (None, None),            # = hline separator
+        (None, r'\hline'),
+        (None, r'\multicolumn{4}{l}{LIME with 2500 samples, abs score of predicted class} \\'),
+        ('tab3-M25',  'R\\textsubscript{LIME}@.25'),
+        ('tab3-M50',  'R\\textsubscript{LIME}@.5'),
+        ('tab3-M75',  'R\\textsubscript{LIME}@.75'),
+        (None, r'\hline'),
+        (None, r'\multicolumn{4}{l}{LIME with 2500 samples, plain score of predicted class} \\'),
         ('tab3-N25',  'R\\textsubscript{LIME}@.25'),
         ('tab3-N50',  'R\\textsubscript{LIME}@.5'),
         ('tab3-N75',  'R\\textsubscript{LIME}@.75'),
-        (None, None),            # = hline separator
+        (None, r'\hline'),
+        (None, r'\multicolumn{4}{l}{LIME with 2500 samples, any support for predicted class} \\'),
+        ('tab3-S25',  'R\\textsubscript{LIME}@.25'),
+        ('tab3-S50',  'R\\textsubscript{LIME}@.5'),
+        ('tab3-S75',  'R\\textsubscript{LIME}@.75'),
+        (None, r'\hline'),
+        (None, r'\multicolumn{4}{l}{LIME with 2500 samples, max(abs(s1),abs(s2),abs(s3))} \\'),
+        ('tab3-X25',  'R\\textsubscript{LIME}@.25'),
+        ('tab3-X50',  'R\\textsubscript{LIME}@.5'),
+        ('tab3-X75',  'R\\textsubscript{LIME}@.75'),
+        (None, r'\hline'),
+        (None, r'\multicolumn{4}{l}{Saliency map with random values (same map for all 6} \\'),
+        (None, r'\multicolumn{4}{l}{settings, \eg @.25 $\subseteq$ @.5; 12 maps, one for each run)} \\'),
         ('tab4-RND25',  'R\\textsubscript{RAND}@.25'),
         ('tab4-RND50',  'R\\textsubscript{RAND}@.5'),
         ('tab4-RND75',  'R\\textsubscript{RAND}@.75'),
-        (None, None),            # = hline separator
+        (None, r'\hline'),
     ]:
         f.write('    ')
         if not m_type:
-            f.write(r'\hline')
+            # print special line
+            f.write(mask_title_left)
             f.write('\n')
             continue
         for is_first_column, tr, te, mask_title in [
