@@ -137,9 +137,11 @@ def get_cell_content(m_type, tr, domain, te, show_stddev = True):
         key = (m_type, tr, domain, te, run)
         if key in data:
             scores.append(data[key])
+    if len(scores) > 4:
+        # enough for box plot test
+        cell_to_scores[(m_type, tr, domain, te)] = scores
     if len(scores) != expected_total_runs:
         return '--.-   -  -.- '
-    cell_to_scores[(m_type, tr, domain, te)] = scores
     avg_score = sum(scores)/float(len(scores))
     if not show_stddev:
         return '%.1f' %avg_score
