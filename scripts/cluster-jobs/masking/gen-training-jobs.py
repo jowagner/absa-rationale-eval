@@ -159,6 +159,7 @@ for RUN in 1 2 3 ; do
     date            >> ${DESC}.start
     echo $MODEL_DIR >> ${DESC}.start
     echo $TR_TASK   >> ${DESC}.start
+    nvidia-smi      >> ${DESC}.start
     touch              ${DESC}.start
 """)
 
