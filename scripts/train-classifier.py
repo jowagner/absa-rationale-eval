@@ -393,7 +393,7 @@ def check_alignment(text, tokens):
     text2 = ''.join(tokens)
     text2 = text2.replace('-EMTCN01-', ':)')  # restore emoticon in SEA
     if text1 != text2:
-        print('Mismatch %r - %r' %(text, tokens))
+        raise ValueError('Mismatch %r - %r' %(text, tokens))
     #else:
     #    print('Match %r - %r' %(text, tokens))
 
@@ -1700,7 +1700,7 @@ def get_embedding_layer(model):
     #return model.bert.embeddings.word_embeddings
 
 # EMNLP 2020 interpretatibility video at 3:09:52
-# with modifications to
+# with modifications
 
 def get_gradients(model, instances, labels):
     embedding_gradients = []
