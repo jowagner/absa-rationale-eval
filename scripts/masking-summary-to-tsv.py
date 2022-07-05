@@ -128,6 +128,8 @@ f.write(r"""% Table with masking results, diagonal of results from Appendix
     \hline
 """)
 
+cell_to_scores = {}
+
 def get_cell_content(m_type, tr, domain, te, show_stddev = True):
     global expected_total_runs
     scores = []
@@ -136,8 +138,8 @@ def get_cell_content(m_type, tr, domain, te, show_stddev = True):
         if key in data:
             scores.append(data[key])
     if len(scores) != expected_total_runs:
-        #raise ValueError('Expected 9 scores, got %r for m_type %r, tr %r, domain %r, te %r and run %r' %(scores, m_type, tr, domain, te, run))
         return '--.-   -  -.- '
+    cell_to_scores[(m_type, tr, domain, te)] = scores
     avg_score = sum(scores)/float(len(scores))
     if not show_stddev:
         return '%.1f' %avg_score
@@ -339,3 +341,20 @@ for m_type, mask_filename, mask_title in [
     f.close()
     #            The majority baselines ``all positive''
     #            have 60.0\% and 71.1\% accuracy respectively.}
+
+# fake accuracy scores around 80% accuracy based on observed
+# variation
+
+f = open('centred-accuracies.txt', 'wt')
+for key in cell_to_scores:
+    correct = []
+    total = 0
+    for score in cell_to_scores[key]:
+        count = int(0.5+16.60*score)  # score is accuracy * 100 and n = 1660
+        correct.append(count)
+        total += count
+    avg_count = total // len(correct)
+    for count in correct:
+        count = 1328 + count - avg_count
+        f.write('%.9f\n' %(100.0*count/1660.0))
+f.close()
