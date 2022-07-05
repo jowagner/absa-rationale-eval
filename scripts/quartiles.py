@@ -233,7 +233,7 @@ def main():
     #       https://en.wikipedia.org/wiki/Quartile
 
     # let's count which method works best on average
-    repetitions = 1200
+    repetitions = 5000
     win_r = 0
     win_m = 0
     win_i = 0
@@ -379,12 +379,12 @@ def main():
             sys.stdout.write('\n')
     
     sys.stdout.write('unique size range %d - %d\n' %(pop_unique_min, pop_unique_max))
-    sys.stdout.write('wins for R: %.1f\n' %win_r)
-    sys.stdout.write('wins for M: %.1f\n' %win_m)
-    sys.stdout.write('wins for I: %.1f\n' %win_i)
-    sys.stdout.write('wins for A: %.1f\n' %win_a)
-    sys.stdout.write('wins for B: %.1f\n' %win_b)
-    sys.stdout.write('wins for E: %.1f\n' %win_e)
+    sys.stdout.write('wins for R: %.0f\n' %win_r)
+    sys.stdout.write('wins for M: %.0f\n' %win_m)
+    sys.stdout.write('wins for I: %.0f\n' %win_i)
+    sys.stdout.write('wins for A: %.0f\n' %win_a)
+    sys.stdout.write('wins for B: %.0f\n' %win_b)
+    sys.stdout.write('wins for E: %.0f\n' %win_e)
 
 if __name__ == "__main__":
     main()
