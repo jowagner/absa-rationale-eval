@@ -29,8 +29,8 @@ for RUN in %(run)d ; do
     date     >> ${OUTNAME}.start
     echo $MODEL_DIR >> ${OUTNAME}.start
     touch ${OUTNAME}.start
-    ../scripts/lime-wrapper.py --abort-on-cache-miss --verbose        --samples 1250 --max-tasks 13540 2> ${OUTNAME}-tr.err > ${OUTNAME}-tr.out
-    ../scripts/lime-wrapper.py --abort-on-cache-miss --verbose --test --samples 1250 --max-tasks  4150 2> ${OUTNAME}-te.err > ${OUTNAME}-te.out
+    ../scripts/lime-wrapper.py --abort-on-cache-miss --verbose        --samples 10000 2> ${OUTNAME}-tr.err > ${OUTNAME}-tr.out
+    ../scripts/lime-wrapper.py --abort-on-cache-miss --verbose --test --samples 10000 2> ${OUTNAME}-te.err > ${OUTNAME}-te.out
     date >> ${OUTNAME}.end
     touch   ${OUTNAME}.end
     date

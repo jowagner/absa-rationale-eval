@@ -52,7 +52,9 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     elif option in ('--preload', '--do-not-wait-for-predictions'):
         preload_tasks = True
     elif option in ('--tasks', '--max-tasks'):
-        max_tasks = int(sys.argv[1])
+        max_tasks = sys.argv[1]
+        if max_tasks != 'unlimited':
+            max_tasks = int(max_tasks)
         del sys.argv[1]
     elif option in ('--samples', '--num-samples'):
         num_samples = int(sys.argv[1])
@@ -65,6 +67,11 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
 
 if preload_tasks and max_tasks is None:
     max_tasks = 100
+
+if max_tasks == 'unlimited':
+    max_tasks = None
+
+assert max_tasks is None or type(max_tasks) is int
 
 # Fetching data, training a classifier
 
@@ -346,10 +353,12 @@ for item_index, item in enumerate(dataset):
     )
 
     try:
-        triplet = cache[0]
+        triplet = cache[0]    # prediction with no tokens masked (mask = 0)
     except KeyError:
         triplet = None
     if triplet:
+        # prediction probabilities for mask 0 are available
+        # --> find argmax (with reproducible randomised tiebreaker)
         print()
         candidates = []
         for p_index, prob in enumerate(triplet):
@@ -358,6 +367,7 @@ for item_index, item in enumerate(dataset):
             tiebreaker = hashlib.sha256(tiebreaker.encode('UTF-8')).hexdigest()
             candidates.append((-prob, tiebreaker, label))
         candidates.sort()
+        # print prediction and probabilities
         row = []
         row.append('Prediction:')
         row.append(candidates[0][-1])
@@ -379,6 +389,8 @@ for item_index, item in enumerate(dataset):
             print(item)
         print()
 
+    # print LIME scores for each token
+    # (unreliable with --preload)
     print('Scores:')
     for index, centre in enumerate(tokens):
         scores = []
