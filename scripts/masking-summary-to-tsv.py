@@ -347,18 +347,21 @@ for m_type, mask_filename, mask_title in [
 # fake accuracy scores around 80% accuracy based on observed
 # variation
 
+n = 1664
+n80 = int(0.5+0.8*n)
+
 f = open('centred-accuracies.txt', 'wt')
 for key in cell_to_scores:
     correct = []
     total = 0
     for score in cell_to_scores[key]:
-        count = int(0.5+16.60*score)  # score is accuracy * 100 and n = 1660
+        count = int(0.5+n*score/100.0)  # score is accuracy * 100
         correct.append(count)
         total += count
     avg_count = total // len(correct)
     for count in correct:
-        count = 1328 + count - avg_count
-        accuracy = 100.0*count/1660.0
+        count = n80 + count - avg_count
+        accuracy = 100.0*count/float(n)
         if 79.0 <= accuracy <= 81.0:
             f.write('%.9f\n' %accuracy)
 f.close()
