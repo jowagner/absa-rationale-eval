@@ -457,6 +457,13 @@ def get_dataset(
                 observed_targets.add(target)
             op_index += 1
         #print()
+    try:
+        annotation.__next__()
+        print('Error: %s contains too many items' %aio_filename)
+        sys.exit(1)
+    except StopIteration:
+        # expected behaviour: xml and aio have the same number of items
+        pass
     return dataset
 
 def get_task_data(
