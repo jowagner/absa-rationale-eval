@@ -137,9 +137,6 @@ def get_cell_content(m_type, tr, domain, te, show_stddev = True):
         key = (m_type, tr, domain, te, run)
         if key in data:
             scores.append(data[key])
-    if len(scores) > 4:
-        # enough for box plot test
-        cell_to_scores[(m_type, tr, domain, te)] = scores
     if len(scores) != expected_total_runs:
         return '--.-   -  -.- '
     avg_score = sum(scores)/float(len(scores))
@@ -154,6 +151,9 @@ def get_cell_content(m_type, tr, domain, te, show_stddev = True):
     #std_dev = (sum(sq_errors)/(n-1.0))**0.5                    # Simple sample std dev
     #std_dev = (sum(sq_errors)/(n-1.5))**0.5                    # Approximate std dev
     std_dev = (sum(sq_errors)/(n-1.5+1.0/(8.0*(n-1.0))))**0.5  # More accurate std dev
+    if std_dev < 0.7:
+        # usable for box plot test
+        cell_to_scores[(m_type, tr, domain, te)] = scores
     return r'%.1f $\pm %.1f$' %(avg_score, std_dev)
 
 is_first = True
