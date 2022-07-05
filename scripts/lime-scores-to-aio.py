@@ -331,6 +331,16 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                         summary_file.write('opinion_id:\t%s\n' %opinion_id)
                         summary_file.write('tokens:\t%s\n' %(' '.join(tokens)))
                         summary_file.write('sea:\t%s\n' %(' '.join(sea)))
+                        # encode saliency values as single characters
+                        saliency_enc_alphabet = 'Oo_iI'
+                        saliency_enc_size = len(saliency_enc_alphabet)
+                        map_enc = []
+                        for t_index in range(len(tokens)):
+                            rank = all_indices.index(t_index)
+                            saliency_enc_index = (saliency_enc_size*t_index)//len(tokens)
+                            char = saliency_enc[saliency_enc_index]
+                            map_enc.append(char)
+                        summary_file.write('map:\t%s\n' %(' '.join(map_enc)))
                         # get confusion matrices for each rationale length
                         length2confusions, best_length = evaluation.get_confusion_matrices(
                             sea, all_indices, tokens,
