@@ -10,8 +10,7 @@
 
 import sys
 
-#methods = 'IG PG LIME-N'.split()
-methods = ['LIME-N', ]
+methods = 'IG PG LIME-M LIME-N LIME-S LIME-X'.split()
 
 n_sets = 4
 runs_per_set = 3
