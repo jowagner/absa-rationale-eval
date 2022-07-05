@@ -358,5 +358,7 @@ for key in cell_to_scores:
     avg_count = total // len(correct)
     for count in correct:
         count = 1328 + count - avg_count
-        f.write('%.9f\n' %(100.0*count/1660.0))
+        accuracy = 100.0*count/1660.0
+        if 79.0 <= accuracy <= 81.0:
+            f.write('%.9f\n' %accuracy)
 f.close()
