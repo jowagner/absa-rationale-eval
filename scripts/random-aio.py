@@ -14,6 +14,7 @@ import sys
 def usage():
     print('Usage: $0 [options] <RELATIVE-LENGTH> < input.aio > output.aio')
     # TODO: print more details how to use this script
+    #       input.aio only needs the text column
 
 debug = False
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
@@ -47,7 +48,7 @@ relative_length = float(sys.argv[1])
 
 assert 0.0 <= relative_length <= 1.0
 
-def get_annotation(f):  # TODO: move shared function to a module
+def get_annotation(f):  # TODO: move shared function to a module, add options "text_only" and "expected_columns"
     tokens = []
     sea = []
     line_no = 0
@@ -65,21 +66,21 @@ def get_annotation(f):  # TODO: move shared function to a module
                 break
         else:
             fields = line.split()
-            if len(fields) != 2:
-                raise ValueError('Unexpected AIO line %d: %r' %(line_no, line))
+            #if len(fields) != 2:
+            #    raise ValueError('Unexpected AIO line %d: %r' %(line_no, line))
             tokens.append(fields[0])
-            sea.append(fields[1])
+            #sea.append(fields[1])
             if starts_at_line < 0:
                 starts_at_line = line_no
 
 item_count = 0
-for tokens, sea, start_line in get_annotation(sys.stdin):
+for tokens, _, start_line in get_annotation(sys.stdin):
     item_count += 1
-    if debug: sys.stdout.write('\nRead item %d from line %d: %r, %r\n' %(item_count, start_line, tokens, sea))
+    if debug: sys.stdout.write('\nRead item %d from line %d: %r\n' %(item_count, start_line, tokens))
     n = len(tokens)
     se_length = int(n * relative_length + 0.5)  # rounding to nearest length
     if debug: sys.stdout.write('%d tokens, %d selected for SE\n' %(n, se_length))
-    # assign randomised saliency scores (+ tie breaker)
+    # assign randomised saliency scores (with index as tie-breaker)
     scores = []
     for index in range(n):
         scores.append((random.random(), index))
@@ -90,23 +91,14 @@ for tokens, sea, start_line in get_annotation(sys.stdin):
     selected = list(map(lambda x: x[1], scores[:se_length]))
     if debug: sys.stdout.write('Selected indices %r\n' %selected)
     # write aio format
-    remaining_i_tags = se_length
-    remaining_o_tags = n - se_length
+    count_i = 0
     for index, token in enumerate(tokens):
-        assert remaining_i_tags + remaining_o_tags > 0
         if index in selected:
-            assert remaining_i_tags > 0
             tag = 'I'
+            count_i += 1
         else:
-            assert remaining_o_tags > 0
             tag = 'O'
-        if debug: sys.stdout.write('%d\t%d\t' %(remaining_i_tags, remaining_o_tags))
         sys.stdout.write('%s\t%s\n' %(token, tag))
-        if tag == 'I':
-            remaining_i_tags -= 1
-        else:
-            remaining_o_tags -= 1
     sys.stdout.write('\n')
-    assert remaining_i_tags == 0
-    assert remaining_o_tags == 0
+    assert count_i == se_length
 if debug: sys.stdout.write('Done\n')
