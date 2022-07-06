@@ -116,6 +116,52 @@ def a_q(values, median):
 def b_q(values, median):
     return helper_a_q(values, True)
 
+
+class BoxPlot:
+
+    def __init__(self, scores):
+        self.median = get_median(scores)
+        self.q1, self.q3 = e_q(scores, self.median)
+        iqr = self.q3 - self.q1
+        assert iqr >= 0.0
+        ci95 = 1.58 * iqr / float(len(scores)**0.5)
+        self.ci95 = (self.median - ci95, self.median + ci95)
+        lower_cut_off = self.q1 - 1.5 * iqr
+        upper_cut_off = self.q3 + 1.5 * iqr
+        self.outliers = []
+        self.inliers  = []
+        for score in scores:
+            if score < lower_cut_off \
+            or score > upper_cut_off:
+                self.outliers.append(score)
+            else:
+                self.inliers.append(score)
+        assert len(self.inliers) > 0
+        self.lower_whisker = min(self.inliers)
+        self.upper_whisker = max(self.inliers)
+
+    def __getitem__(self, key)
+        if type(key) == tuple:
+            if key[0] in ('O', 'o', 'outlier'):
+                return self.outliers[key[1]]
+            elif key[0] in ('I', 'i', 'inlier'):
+                return self.inliers[key[1]]
+            else:
+                raise KeyError
+        elif key in ('B', 'b', 'L', 'l', 'bottom-whisker', 'lower-whisker'):
+            return self.lower_whisker
+        elif key in ('T', 't', 'U', 'u', 'top-whisker',    'upper-whisker'):
+            return self.upper_whisker
+        elif key in ('Q1', 'q1', '25th-percentile'):
+            return self.q1
+        elif key in ('Q3', 'q3', '75th-percentile'):
+            return self.q3
+        elif key in ('M', 'm', 'median'):
+            return self.median
+        else:
+            raise KeyError
+
+
 def get_synthetic_population(size, interval = 100):
     population = []
     for _ in range(size):
@@ -226,6 +272,7 @@ def main():
     print_sample_with_annotation(sample, annotation)
 
     #sys.exit(0)
+    sys.stdout.flush()
 
     sys.stdout.write('\n== Which method works best on average? ==\n\n')
     

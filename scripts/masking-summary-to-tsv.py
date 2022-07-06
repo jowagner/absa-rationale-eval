@@ -130,7 +130,8 @@ f.write(r"""% Table with masking results, diagonal of results from Appendix
 
 cell_to_scores = {}
 
-def get_cell_content(m_type, tr, domain, te, show_stddev = True, extra_sets = 0):
+
+def get_cell_scores(m_type, tr, domain, te, extra_sets = 0):
     global opt_runs_per_set
     global expected_total_runs
     scores = []
@@ -139,6 +140,13 @@ def get_cell_content(m_type, tr, domain, te, show_stddev = True, extra_sets = 0)
         key = (m_type, tr, domain, te, run)
         if key in data:
             scores.append(data[key])
+    return scores
+
+def get_cell_content(m_type, tr, domain, te, show_stddev = True, extra_sets = 0):
+    global opt_runs_per_set
+    global expected_total_runs
+    scores = get_cell_scores(m_type, tr, domain, te, extra_sets)
+    total_runs = expected_total_runs + opt_runs_per_set * extra_sets
     if len(scores) < total_runs:
         return '--.-   -  -.- '
     avg_score = sum(scores)/float(len(scores))
@@ -368,3 +376,61 @@ for key in cell_to_scores:
         if 78.0 <= accuracy <= 82.0:
             f.write('%.9f\n' %accuracy)
 f.close()
+
+# compile data for box plots
+
+for domain in 'Laptop Restaurant Overall'.split():
+    if not include_domain_breakdown and domain != 'Overall':
+        continue
+    f = open('box-plot-full-rnd-none.tsv', 'wt')
+    
+    boxplots = []
+    boxplots.append(('Full', BoxPlot(
+        get_cell_scores('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 4),
+    ))
+    boxplots.append(('None', BoxPlot(
+        get_cell_scores('tab2-SE', 'tr=None', domain, 'None', extra_sets = 4),
+    ))
+
+    boxplots.append(('RND25', BoxPlot(
+        get_cell_scores('tab4-RND25', 'tr=SE/R',       domain, 'SE/R' ) + \
+        get_cell_scores('tab4-RND75', 'tr=Z-CompSE/R', domain, 'Z-CompSE/R' ),
+    ))
+    boxplots.append(('RND50', BoxPlot(
+        get_cell_scores('tab4-RND50', 'tr=SE/R',       domain, 'SE/R' ) + \
+        get_cell_scores('tab4-RND50', 'tr=Z-CompSE/R', domain, 'Z-CompSE/R' ),
+    ))
+    boxplots.append(('RND75', BoxPlot(
+        get_cell_scores('tab4-RND75', 'tr=SE/R',       domain, 'SE/R' ) + \
+        get_cell_scores('tab4-RND25', 'tr=Z-CompSE/R', domain, 'Z-CompSE/R' ),
+    ))
+    header = []
+    header.append('Attribute')
+    for bp_name, _ in boxplots:
+        header.append(bp_name)
+    f.write('\t'.join(row))
+    f.write('\n')
+    for attr_name in 'B Q1 M Q3 T':
+        row = []
+        row.append(attr_name)
+        for bp_name, boxplot in boxplots:
+            row.append('%.9f' %(boxplot[bp_name]))
+        f.write('\t'.join(row))
+        f.write('\n')
+    outlier_index = 0
+    while True:
+        found_outlier = False
+        row = []
+        row.append('O_%d' %(outlier_index + 1))
+        for bp_name, boxplot in boxplots:
+            try:
+                outlier = '%.9f' %(boxplot[('O', outlier_index)])
+                found_outlier = True
+            except KeyError:
+                outlier = ''
+            row.append(outlier)
+        if not found_outlier:
+            break
+        f.write('\t'.join(row))
+        f.write('\n')
+    f.close()
