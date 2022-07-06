@@ -65,8 +65,8 @@ while True:
         assert len(fields) == 4
         assert fields[0] == 'c'
         set_index = int(fields[2])-1
-        run_in_set_index = int(fields[3])
-        run = opt_runs_per_set * set_index + run_in_set_index
+        run_in_set = int(fields[3])
+        run = opt_runs_per_set * set_index + run_in_set
         tr = trshort2sortkey[fields[1]]
         if filename in ('stdout-training-with-sea-aio.txt', 'stdout.txt'):
             m_type = 'tab2-SE'
@@ -136,6 +136,7 @@ cell_to_scores = {}
 def get_cell_scores(m_type, tr, domain, te, extra_sets = 0):
     global opt_runs_per_set
     global expected_total_runs
+    global data
     scores = []
     total_runs = expected_total_runs + opt_runs_per_set * extra_sets
     for run in range(1, total_runs+1):
@@ -147,9 +148,16 @@ def get_cell_scores(m_type, tr, domain, te, extra_sets = 0):
 def get_cell_content(m_type, tr, domain, te, show_stddev = True, extra_sets = 0):
     global opt_runs_per_set
     global expected_total_runs
+    global data
     scores = get_cell_scores(m_type, tr, domain, te, extra_sets)
     total_runs = expected_total_runs + opt_runs_per_set * extra_sets
     if len(scores) < total_runs:
+        sys.stderr.write('Warning: Expected %d runs for %r but only found %d\n' %(
+            total_runs, (m_type, tr, domain, te), len(scores),
+        ))
+        #for key in data:
+        #    if key[:4] == (m_type, tr, domain, te):
+        #        sys.stderr.write('\t[%r]\t%.9f\n' %(key, data[key]))
         return '--.-   -  -.- '
     avg_score = sum(scores)/float(len(scores))
     if not show_stddev:
@@ -322,12 +330,12 @@ for m_type, mask_filename, mask_title in [
     \hline
 """ %locals())
 
-        for tr, tr_title, extra_sets in [
-            ('tr=Full',     'Full',                 4),
-            ('tr=None',     'None',                 4),
-            ('tr=SE/R',     mask_title,             0),
-            ('tr=Y_Other',  '$\\neg$' + mask_title, 0),
-            ('tr=Z_Concat', 'Concat',               0),
+        for tr, tr_title in [
+            ('tr=Full',     'Full'),
+            ('tr=None',     'None'),
+            ('tr=SE/R',     mask_title),
+            ('tr=Y_Other',  '$\\neg$' + mask_title),
+            ('tr=Z_Concat', 'Concat'),
         ]:
             gap = (25 - len(tr_title)) * ' '
             f.write(r'    \textbf{%s}%s' %(tr_title, gap))
@@ -337,6 +345,10 @@ for m_type, mask_filename, mask_title in [
                 'SE/R',
                 'Z-CompSE/R',
             ]:
+                if m_type == 'tab2-SE' and tr in ('tr=Full', 'tr=None'):
+                    extra_sets = 4
+                else:
+                    extra_sets = 0
                 try:
                     f.write('& %s ' %get_cell_content(
                         m_type, tr, domain, te,
