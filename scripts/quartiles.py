@@ -140,7 +140,7 @@ class BoxPlot:
         self.lower_whisker = min(self.inliers)
         self.upper_whisker = max(self.inliers)
 
-    def __getitem__(self, key)
+    def __getitem__(self, key):
         if type(key) == tuple:
             if key[0] in ('O', 'o', 'outlier'):
                 return self.outliers[key[1]]
@@ -159,7 +159,7 @@ class BoxPlot:
         elif key in ('M', 'm', 'median'):
             return self.median
         else:
-            raise KeyError
+            raise KeyError('unknown key "%s" for box plot' %key)
 
 
 def get_synthetic_population(size, interval = 100):
