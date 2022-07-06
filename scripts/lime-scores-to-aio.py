@@ -30,6 +30,7 @@ opt_classes    = 'negative neutral positive'.split()
 data_prefix    = 'data/'
 opt_write_fscores = True
 opt_exclude_function_words = True
+saliency_enc_alphabet = 'Ii_oO'
 
 while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     option = sys.argv[1].replace('_', '-')
@@ -332,11 +333,10 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                         summary_file.write('tokens:\t%s\n' %(' '.join(tokens)))
                         summary_file.write('sea:\t%s\n' %(' '.join(sea)))
                         # encode saliency values as single characters
-                        saliency_enc_alphabet = 'Oo_iI'
                         saliency_enc_size = len(saliency_enc_alphabet)
                         map_enc = []
                         for t_index in range(len(tokens)):
-                            rank = all_indices.index(t_index)
+                            rank = all_indices.index(t_index)  # 0 = most salient
                             saliency_enc_index = (saliency_enc_size*t_index)//len(tokens)
                             char = saliency_enc[saliency_enc_index]
                             map_enc.append(char)
