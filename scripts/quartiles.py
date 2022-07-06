@@ -129,23 +129,23 @@ class BoxPlot:
         lower_cut_off = self.q1 - 1.5 * iqr
         upper_cut_off = self.q3 + 1.5 * iqr
         self.outliers = []
-        self.inliers  = []
+        self.backers  = []
         for score in scores:
             if score < lower_cut_off \
             or score > upper_cut_off:
                 self.outliers.append(score)
             else:
-                self.inliers.append(score)
-        assert len(self.inliers) > 0
-        self.lower_whisker = min(self.inliers)
-        self.upper_whisker = max(self.inliers)
+                self.backers.append(score)
+        assert len(self.backers) > 0
+        self.lower_whisker = min(self.backers)
+        self.upper_whisker = max(self.backers)
 
     def __getitem__(self, key):
         if type(key) == tuple:
             if key[0] in ('O', 'o', 'outlier'):
                 return self.outliers[key[1]]
-            elif key[0] in ('I', 'i', 'inlier'):
-                return self.inliers[key[1]]
+            elif key[0] in ('I', 'i', 'inside', 'backer'):
+                return self.backers[key[1]]
             else:
                 raise KeyError
         elif key in ('B', 'b', 'L', 'l', 'bottom-whisker', 'lower-whisker'):
