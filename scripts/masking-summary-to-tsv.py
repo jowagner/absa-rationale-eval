@@ -130,14 +130,16 @@ f.write(r"""% Table with masking results, diagonal of results from Appendix
 
 cell_to_scores = {}
 
-def get_cell_content(m_type, tr, domain, te, show_stddev = True):
+def get_cell_content(m_type, tr, domain, te, show_stddev = True, extra_sets = 0):
+    global opt_runs_per_set
     global expected_total_runs
     scores = []
-    for run in range(1, expected_total_runs+1):
+    total_runs = expected_total_runs + opt_runs_per_set * extra_sets
+    for run in range(1, total_runs+1):
         key = (m_type, tr, domain, te, run)
         if key in data:
             scores.append(data[key])
-    if len(scores) != expected_total_runs:
+    if len(scores) < total_runs:
         return '--.-   -  -.- '
     avg_score = sum(scores)/float(len(scores))
     if not show_stddev:
@@ -158,9 +160,9 @@ def get_cell_content(m_type, tr, domain, te, show_stddev = True):
 
 is_first = True
 for domain, maj_acc, baseline_acc in [
-    ('Laptop',     60.0, get_cell_content('tab2-SE', 'tr=Full', 'Laptop', 'Full')),
-    ('Restaurant', 71.1, get_cell_content('tab2-SE', 'tr=Full', 'Restaurant', 'Full')),
-    ('Overall',    65.8, get_cell_content('tab2-SE', 'tr=Full', 'Overall', 'Full')),
+    ('Laptop',     60.0, get_cell_content('tab2-SE', 'tr=Full', 'Laptop',     'Full', extra_sets = 4)),
+    ('Restaurant', 71.1, get_cell_content('tab2-SE', 'tr=Full', 'Restaurant', 'Full', extra_sets = 4)),
+    ('Overall',    65.8, get_cell_content('tab2-SE', 'tr=Full', 'Overall',    'Full', extra_sets = 4)),
 ]:
     if not include_domain_breakdown and domain != 'Overall':
         continue
@@ -169,9 +171,9 @@ for domain, maj_acc, baseline_acc in [
 """)
     is_first = False
     f.write(r'    \textbf{Full}                      & ')
-    f.write(get_cell_content('tab2-SE', 'tr=Full', domain, 'Full'))
+    f.write(get_cell_content('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 4))
     f.write(r' & \textbf{None}                            & ')
-    f.write(get_cell_content('tab2-SE', 'tr=None', domain, 'None'))
+    f.write(get_cell_content('tab2-SE', 'tr=None', domain, 'None', extra_sets = 4))
     f.write(r' \\')
     f.write('\n')
     for m_type, mask_title_left in [
@@ -310,12 +312,12 @@ for m_type, mask_filename, mask_title in [
     \hline
 """ %locals())
 
-        for tr, tr_title in [
-            ('tr=Full',    'Full'),
-            ('tr=None',    'None'),
-            ('tr=SE/R',    mask_title),
-            ('tr=Y_Other', '$\\neg$' + mask_title),
-            ('tr=Z_Concat', 'Concat'),
+        for tr, tr_title, extra_sets in [
+            ('tr=Full',     'Full',                 4),
+            ('tr=None',     'None',                 4),
+            ('tr=SE/R',     mask_title,             0),
+            ('tr=Y_Other',  '$\\neg$' + mask_title, 0),
+            ('tr=Z_Concat', 'Concat',               0),
         ]:
             gap = (25 - len(tr_title)) * ' '
             f.write(r'    \textbf{%s}%s' %(tr_title, gap))
@@ -328,7 +330,8 @@ for m_type, mask_filename, mask_title in [
                 try:
                     f.write('& %s ' %get_cell_content(
                         m_type, tr, domain, te,
-                        show_stddev = opt_show_stddev_in_appendix
+                        show_stddev = opt_show_stddev_in_appendix,
+                        extra_sets = extra_sets,
                     ))
                 except ValueError:
                     f.write('& -- ')
@@ -362,6 +365,6 @@ for key in cell_to_scores:
     for count in correct:
         count = n80 + count - avg_count
         accuracy = 100.0*count/float(n)
-        if 79.0 <= accuracy <= 81.0:
+        if 78.0 <= accuracy <= 82.0:
             f.write('%.9f\n' %accuracy)
 f.close()
