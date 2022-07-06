@@ -113,10 +113,7 @@ def get_package_name(items):
         h.update(('%d:%s\n' %(len(item), ' '.join(item))).encode('UTF-8'))
     return '%d-%s' %(len(items), h.hexdigest())
 
-def add_probs(mask2triplet, prob_path):
-    name = prob_path.split('/')[-1]
-    n_items = int(name.split('-')[0])
-    f = open(prob_path, 'rt')
+def add_probs_from_section(mask2triplet, f, n_items):
     for row_index in range(n_items):
         fields = f.readline().split()
         assert len(fields) == 4
@@ -125,25 +122,127 @@ def add_probs(mask2triplet, prob_path):
         for col_index in (1,2,3):
             triplet.append(float(fields[col_index]))
         mask2triplet[mask] = triplet
+    return mask2triplet
+
+def add_probs(mask2triplet, prob_path):
+    name = prob_path.split('/')[-1]
+    n_items = int(name.split('-')[0])
+    f = open(prob_path, 'rt')
+    add_probs_from_section(mask2triplet, f, n_items)
     if f.readline():
         print('# Warning: trailing line(s) in', prob_path)
     f.close()
     return mask2triplet
 
-def get_cache():
+def read_prob_itemfiles(ds_index = None, i_item = None):
     global prob_dir
-    global item_info
     global dataset_index
     global item_index
-    item_dir = '%s/%d/%d' %(prob_dir, dataset_index, item_index)
+    if ds_index is None:
+        ds_index = dataset_index
+    if i_indes is None:
+        i_index = item_index
+    item_dir = '%s/%d/%d' %(prob_dir, ds_index, i_index)
     retval = {}
+    paths = []
     if not os.path.exists(item_dir):
-        return retval
+        return retval, paths
     for entry in os.listdir(item_dir):
         candidate_path = os.path.join(item_dir, entry)
         if '-' in entry and os.path.isfile(candidate_path):
             add_probs(retval, candidate_path)
+            paths.append(candidate_path)
+    return retval, paths
+
+chunk_cache_current_key = None
+item2cache = {}
+cache = None
+
+def get_chunk_cache(dataset_index, base_item_index):
+    chunk_path = '%s/c%d-%d/%d' %(
+        prob_dir, dataset_index,
+        base_item_index // 1000,
+        base_item_index,
+    )
+    retval = {}
+    for item_offset in range(100):
+        my_item_index = base_item_index + item_offset
+        retval[my_item_index] = {}
+    if not os.path.exists(chunk_path):
+        return retval
+    f = open(chunk_path, 'rt')
+    while True:
+        line = f.readline()
+        if not line:
+            break
+        fields = line.split()
+        assert len(fields) == 2
+        my_item_index = int(fields[0])
+        n_items       = int(fields[1])
+        add_probs_from_section(
+            retval[my_item_index],   # may be updated multiple times
+            f, n_items
+        )
+    f.close()
     return retval
+
+def save_chunk_cache(dataset_index, base_item_index):
+    chunk_path = '%s/c%d-%d/%d' %(
+        prob_dir, dataset_index,
+        base_item_index // 1000,
+        base_item_index,
+    )
+    f = open(chunk_path + '.part', 'rt')
+    for my_item_index in item2cache:
+        mask2triplet = item2cache[my_item_index]
+        n_items = len(mask2triplet)
+        f.write('%d\t%d\n' %(my_item_index, n_items))
+        for mask in mask2triplet:
+            triplet = mask2triplet[mask]
+            f.write('%d\t' %mask)
+            f.write('%.9f\t%.9f\t%.9f\n' %triplet)
+    f.close()
+    os.replace(chunk_path + '.part', chunk_path)
+
+def get_cache():
+    global dataset_index
+    global item_index
+    global chunk_cache_current_key
+    global item2cache
+    global cache
+    chunk_key = (dataset_index, item_index // 100)
+    if chunk_cache_current_key == key:
+        cache = item2cache[item_index]  # set global variable and
+        return cache                    # also return for convenience
+    # new chunk key --> read all relevant data
+    base_item_index = 100 * (item_index // 100)
+    item2cache = get_chunk_cache(dataset_index, base_item_index)
+    # check for cache files in old format
+    old_paths = []
+    new_cache_updated = False
+    for item_offset in range(100):
+        my_item_index = base_item_index + item_offset
+        old_cache, paths = read_prob_itemfiles(
+            dataset_index, my_item_index,
+        )
+        old_paths += paths
+        # merge with new cache
+        new_cache = item2cache[item_index]
+        for mask in cache:
+            new_cache[mask] = old_cache[mask]
+        if old_cache:
+            new_cache_updated = True
+    # update new cache on disk if necessary
+    if new_cache_updated:
+        save_chunk_cache(dataset_index, base_item_index)
+        # delete old files
+        for path in old_paths:
+            os.unlink(path)
+    # set remaining global variables
+    cache = item2cache[item_index]
+    chunk_cache_current_key = key
+    # return cache for convenience
+    return cache
 
 def write_package(package, name):
     global item_info
@@ -257,8 +356,6 @@ def get_mask(sentence):
             mask = mask + 1
     return mask
 
-cache = None
-
 def my_predict_proba(items):
     ''' input: list of d strings
         output: a (d, 3) numpy array with probabilities for
@@ -274,7 +371,7 @@ def my_predict_proba(items):
     # same input over and over again; furthermore, caching speeds
     # up repeat runs, e.g. increasing the number of samples)
     row2mask = []
-    cache = get_cache()
+    get_cache()
     masks = set()
     new = []
     after_dedup = 0
