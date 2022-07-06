@@ -121,7 +121,7 @@ def add_probs_from_section(mask2triplet, f, n_items):
         triplet = []
         for col_index in (1,2,3):
             triplet.append(float(fields[col_index]))
-        mask2triplet[mask] = triplet
+        mask2triplet[mask] = tuple(triplet)
     return mask2triplet
 
 def add_probs(mask2triplet, prob_path):
@@ -134,13 +134,13 @@ def add_probs(mask2triplet, prob_path):
     f.close()
     return mask2triplet
 
-def read_prob_itemfiles(ds_index = None, i_item = None):
+def read_prob_itemfiles(ds_index = None, i_index = None):
     global prob_dir
     global dataset_index
     global item_index
     if ds_index is None:
         ds_index = dataset_index
-    if i_indes is None:
+    if i_index is None:
         i_index = item_index
     item_dir = '%s/%d/%d' %(prob_dir, ds_index, i_index)
     retval = {}
@@ -187,15 +187,19 @@ def get_chunk_cache(dataset_index, base_item_index):
     return retval
 
 def save_chunk_cache(dataset_index, base_item_index):
-    chunk_path = '%s/c%d-%d/%d' %(
+    chunk_dir = '%s/c%d-%d' %(
         prob_dir, dataset_index,
         base_item_index // 1000,
-        base_item_index,
     )
-    f = open(chunk_path + '.part', 'rt')
+    if not os.path.exists(chunk_dir):
+        os.makedirs(chunk_dir)
+    chunk_path = '%s/%d' %(chunk_dir, base_item_index)
+    f = open(chunk_path + '.part', 'wt')
     for my_item_index in item2cache:
         mask2triplet = item2cache[my_item_index]
         n_items = len(mask2triplet)
+        if not n_items:
+            continue
         f.write('%d\t%d\n' %(my_item_index, n_items))
         for mask in mask2triplet:
             triplet = mask2triplet[mask]
@@ -211,7 +215,7 @@ def get_cache():
     global item2cache
     global cache
     chunk_key = (dataset_index, item_index // 100)
-    if chunk_cache_current_key == key:
+    if chunk_cache_current_key == chunk_key:
         cache = item2cache[item_index]  # set global variable and
         return cache                    # also return for convenience
     # new chunk key --> read all relevant data
@@ -227,10 +231,9 @@ def get_cache():
         )
         old_paths += paths
         # merge with new cache
-        new_cache = item2cache[item_index]
-        for mask in cache:
+        new_cache = item2cache[my_item_index]
+        for mask in old_cache:
             new_cache[mask] = old_cache[mask]
-        if old_cache:
             new_cache_updated = True
     # update new cache on disk if necessary
     if new_cache_updated:
@@ -240,7 +243,7 @@ def get_cache():
             os.unlink(path)
     # set remaining global variables
     cache = item2cache[item_index]
-    chunk_cache_current_key = key
+    chunk_cache_current_key = chunk_key
     # return cache for convenience
     return cache
 
