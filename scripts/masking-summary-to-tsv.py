@@ -10,6 +10,8 @@
 
 import sys
 
+from quartiles import BoxPlot
+
 opt_show_stddev_in_appendix = False
 opt_number_of_sets = 4
 opt_runs_per_set = 3
