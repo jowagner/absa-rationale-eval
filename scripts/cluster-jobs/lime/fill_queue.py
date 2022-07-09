@@ -101,7 +101,7 @@ def main():
             assert len(fields) >= 8
             assert fields[3] == opt_username
             # extract data
-            job_name = fields[2][:-3]  # remove suffix with estimated duration
+            job_name = fields[2].split('-')[0]
             job_state = fields[4]
             queue[(job_name, job_state)] += 1
             resource = get_resource(opt_jobs, job_name)
