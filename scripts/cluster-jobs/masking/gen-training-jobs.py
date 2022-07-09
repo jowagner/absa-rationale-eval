@@ -165,6 +165,7 @@ for RUN in 1 2 3 ; do
     echo $MODEL_DIR >> ${DESC}.start
     echo $TR_TASK   >> ${DESC}.start
     nvidia-smi      >> ${DESC}.start
+    echo $SLURM_JOB_ID >> ${DESC}.start
     touch              ${DESC}.start
 """)
 
