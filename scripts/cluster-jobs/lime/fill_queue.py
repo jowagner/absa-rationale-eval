@@ -21,16 +21,16 @@ import sys
 import time
 from collections import defaultdict
 
-def get_resource(jobs, job_name):
-    for prefix, resource, _, _, _ in jobs:
-        if job_name.startswith(prefix):
+def get_resource(jobs, job_name_prefix):
+    for job_name, resource, _, _, _ in jobs:
+        if job_name.startswith(job_name_prefix):
             return resource
     # master and cache jobs
     return None
 
 def main():
     opt_jobs = [
-        # job_name_prefix, resource, script_name, max_waiting, max_running
+        # job_name, resource, script_name, max_waiting, max_running
         ('lpdr-1-1', 'rtx208', 'run-lime-predict-p6-c-f-11-rtx2080ti.job',   0, 4),
         ('lpdr-1-2', 'rtx208', 'run-lime-predict-p6-c-f-12-rtx2080ti.job',   0, 4),
         ('lpdr-1-3', 'rtx208', 'run-lime-predict-p6-c-f-13-rtx2080ti.job',   0, 4),
@@ -101,15 +101,20 @@ def main():
             assert len(fields) >= 8
             assert fields[3] == opt_username
             # extract data
-            job_name = fields[2].split('-')[0]
+            job_name = fields[2]
+            job_name_prefix = job_name.split('-')[0]
+            inbox = job_name[-3:]
             job_state = fields[4]
+            queue[(job_name_prefix, job_state)] += 1
             queue[(job_name, job_state)] += 1
-            resource = get_resource(opt_jobs, job_name)
+            queue[(inbox, job_state)] += 1
+            resource = get_resource(opt_jobs, job_name_prefix)
             queue[(resource, job_state)] += 1
         print('My jobs at', time.ctime(now))
         for key in sorted(list(queue.keys())):
             print('\t%r with frequency %d' %(key, queue[key]))
         # check what may be needed
+        non_empty_inboxes = 0
         for inbox in '1-1 1-2 1-3 2-1 2-2 2-3 3-1 3-2 3-3 4-1 4-2 4-3'.split():
             inbox_path = '%s/c-f-%s/tasks' %(opt_project_dir, inbox)
             has_tasks[inbox] = False
@@ -117,7 +122,10 @@ def main():
             for inbox_f in entries:
                 if inbox_f.endswith('.new'):
                     has_tasks[inbox] = len(entries) # upper bound for # tasks (there can be other entries)
+                    non_empty_inboxes += 1
                     break
+            if non_empty_inbox >= random.randrange(3,7):
+                break
         # check what to submit
         std_jobs = []
         prio_jobs = []
@@ -131,13 +139,14 @@ def main():
         n_submitted = 0
         for job_name, resource, script_name, max_waiting, max_running in opt_jobs:
             inbox = job_name[-3:]
+            job_name_prefix = job_name.split('-')[0]
             if not has_tasks[inbox]:
                 continue
             if queue[(resource, 'PD')] > max_waiting:
                 continue
-            if queue[(job_name, 'PD')] > max_waiting:
+            if queue[(job_name_prefix, 'PD')] > max_waiting:
                 continue
-            if queue[(job_name, 'R')] > max_running:
+            if queue[(job_name_prefix, 'R')] > max_running:
                 continue
             # submit job
             sys.stdout.flush()   # make sure command output appears after our last output
