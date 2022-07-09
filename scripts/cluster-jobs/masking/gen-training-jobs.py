@@ -72,7 +72,12 @@ for tr_task_short, tr_task_long, runs_per_set, hours_per_epoch in [
      ('X75', True,  'best-X75.ckpt'),
   ]:
     sys.stdout.write('%s %s %s\n' %(tr_task_short, gpu, aio_name))
-    for set_rank in (1,2,3,4):
+    if aio_name == 'sea' and tr_task_short in 'fn':
+        n_sets = 8
+    else:
+        n_sets = 4
+    for set_index in range(n_sets):
+        set_rank = 1 + set_index
         with open('%s/run-train-c-%s-%s-%d1-to-%d3.job' %(   #-hp-%d.job' %(
             gpu, aio_name, tr_task_short, set_rank, set_rank #, hparam
         ), 'w') as f:
