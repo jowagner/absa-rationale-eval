@@ -1312,7 +1312,7 @@ class Classifier(pl.LightningModule):
         output = OrderedDict({
             test_type + "_loss": loss_val,
             test_type + "_acc":  val_acc,
-            'batch_size': len(batch),
+            'y_numel': y.numel(),
         })
         return output
 
@@ -1351,11 +1351,14 @@ class Classifier(pl.LightningModule):
             #    val_acc = torch.mean(val_acc)
             # We weight the batch accuracy by batch size to not give
             # higher weight to the items of a smaller, final bacth.
-            batch_size = output['batch_size']
+            batch_size = output['y_numel']
             val_acc_mean += val_acc * batch_size
             total_size += batch_size
+            #if batch_size < 8:
+            #    print('Small batch', output)
         val_loss_mean /= len(outputs)
         val_acc_mean /= total_size
+        #print('Total items:', total_size)
         self.log(test_type+'_loss', val_loss_mean)
         self.log(test_type+'_acc',  val_acc_mean)
 
