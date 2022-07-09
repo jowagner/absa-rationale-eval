@@ -113,9 +113,10 @@ def main():
         for inbox in '1-1 1-2 1-3 2-1 2-2 2-3 3-1 3-2 3-3 4-1 4-2 4-3'.split():
             inbox_path = '%s/c-f-%s/tasks' %(opt_project_dir, inbox)
             has_tasks[inbox] = False
-            for inbox_f in os.listdir(inbox_path):
+            entries = os.listdir(inbox_path)
+            for inbox_f in entries:
                 if inbox_f.endswith('.new'):
-                    has_tasks[inbox] = True
+                    has_tasks[inbox] = len(entries) # upper bound for # tasks (there can be other entries)
                     break
         # check what to submit
         std_jobs = []
@@ -148,7 +149,9 @@ def main():
                 print('Error submitting job, trying again in a minute')
                 earliest_next_submit = time.time() + 60.0
                 break
-            print('Submitted %s (%s)' %(job_name, script_name))
+            print('Submitted %s (%s) with %d entries(s) in inbox' %(
+                job_name, script_name, has_tasks[inbox]i
+            ))
             # move forward time for next job submission
             now = time.time()
             while earliest_next_submit <= now:
