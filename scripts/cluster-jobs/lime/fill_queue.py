@@ -124,7 +124,7 @@ def main():
                     has_tasks[inbox] = len(entries) # upper bound for # tasks (there can be other entries)
                     non_empty_inboxes += 1
                     break
-            if non_empty_inbox >= random.randrange(3,7):
+            if non_empty_inboxes >= random.randrange(3,7):
                 break
         # check what to submit
         std_jobs = []
