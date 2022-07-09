@@ -1314,6 +1314,15 @@ class Classifier(pl.LightningModule):
             test_type + "_acc":  val_acc,
             'y_numel': y.numel(),
         })
+        y = y.tolist()
+        p = labels_hat.tolist()
+        for index in range(len(y)):
+            prediction = p[index]
+            gold_label = y[index]
+            key = 'g%d-p%d' %(gold_label, prediction)
+            if not key in output:
+                output[key] = 0
+            output[key] += 1
         return output
 
     def validation_step(self, batch: tuple, batch_nb: int, *args, **kwargs) -> dict:
@@ -1338,6 +1347,7 @@ class Classifier(pl.LightningModule):
         val_loss_mean = 0.0
         val_acc_mean = 0.0
         total_size = 0
+        confusion_matrix = {}
         for output in outputs:
             val_loss = output[test_type + "_loss"]
             # reduce manually when using dp
@@ -1356,9 +1366,15 @@ class Classifier(pl.LightningModule):
             total_size += batch_size
             #if batch_size < 8:
             #    print('Small batch', output)
+            for key in output.keys():
+                if key.startswith('g') and '-p' in key:
+                    if key not in confusion_matrix:
+                        confusion_matrix[key] = 0
+                    confusion_matrix[key] += output[key]
         val_loss_mean /= len(outputs)
         val_acc_mean /= total_size
         #print('Total items:', total_size)
+        print('Confusion matrix:', confusion_matrix)
         self.log(test_type+'_loss', val_loss_mean)
         self.log(test_type+'_acc',  val_acc_mean)
 
