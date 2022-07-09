@@ -150,7 +150,7 @@ def main():
                 earliest_next_submit = time.time() + 60.0
                 break
             print('Submitted %s (%s) with %d entries(s) in inbox' %(
-                job_name, script_name, has_tasks[inbox]i
+                job_name, script_name, has_tasks[inbox]
             ))
             # move forward time for next job submission
             now = time.time()
