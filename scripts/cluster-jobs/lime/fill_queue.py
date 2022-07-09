@@ -116,16 +116,16 @@ def main():
         # check what may be needed
         non_empty_inboxes = 0
         for inbox in '1-1 1-2 1-3 2-1 2-2 2-3 3-1 3-2 3-3 4-1 4-2 4-3'.split():
-            inbox_path = '%s/c-f-%s/tasks' %(opt_project_dir, inbox)
             has_tasks[inbox] = False
+            if non_empty_inboxes >= random.randrange(3,7):
+                continue
+            inbox_path = '%s/c-f-%s/tasks' %(opt_project_dir, inbox)
             entries = os.listdir(inbox_path)
             for inbox_f in entries:
                 if inbox_f.endswith('.new'):
                     has_tasks[inbox] = len(entries) # upper bound for # tasks (there can be other entries)
                     non_empty_inboxes += 1
                     break
-            if non_empty_inboxes >= random.randrange(3,7):
-                break
         # check what to submit
         std_jobs = []
         prio_jobs = []
