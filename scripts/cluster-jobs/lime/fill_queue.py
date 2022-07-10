@@ -65,7 +65,7 @@ def main():
     opt_username = getpass.getuser()
     start_time = time.time()
     earliest_next_submit = start_time
-    has_tasks = {}
+    n_tasks = {}
     while True:
         exit_reason = None
         if opt_stopfile and os.path.exists(opt_stopfile):
@@ -116,16 +116,17 @@ def main():
         # check what may be needed
         non_empty_inboxes = 0
         for inbox in '1-1 1-2 1-3 2-1 2-2 2-3 3-1 3-2 3-3 4-1 4-2 4-3'.split():
-            has_tasks[inbox] = False
+            n_tasks[inbox] = 0  # can also mean "did not check"
             if non_empty_inboxes >= random.randrange(3,7):
                 continue
             inbox_path = '%s/c-f-%s/tasks' %(opt_project_dir, inbox)
             entries = os.listdir(inbox_path)
             for inbox_f in entries:
                 if inbox_f.endswith('.new'):
-                    has_tasks[inbox] = len(entries) # upper bound for # tasks (there can be other entries)
-                    non_empty_inboxes += 1
-                    break
+                    n_tasks[inbox] += 1
+            if n_tasks[inbox] > 0:
+                non_empty_inboxes += 1
+            print('Inbox %s with %d tasks' %(inbox, n_tasks[inbox]))
         # check what to submit
         std_jobs = []
         prio_jobs = []
@@ -140,7 +141,7 @@ def main():
         for job_name, resource, script_name, max_waiting, max_running in opt_jobs:
             inbox = job_name[-3:]
             job_name_prefix = job_name.split('-')[0]
-            if not has_tasks[inbox]:
+            if not n_tasks[inbox]:
                 continue
             if queue[(resource, 'PD')] > max_waiting:
                 continue
@@ -158,8 +159,8 @@ def main():
                 print('Error submitting job, trying again in a minute')
                 earliest_next_submit = time.time() + 60.0
                 break
-            print('Submitted %s (%s) with %d entries(s) in inbox' %(
-                job_name, script_name, has_tasks[inbox]
+            print('Submitted %s (%s) with %d tasks(s) in inbox' %(
+                job_name, script_name, n_tasks[inbox]
             ))
             # move forward time for next job submission
             now = time.time()
