@@ -139,6 +139,7 @@ class BoxPlot:
         assert len(self.backers) > 0
         self.lower_whisker = min(self.backers)
         self.upper_whisker = max(self.backers)
+        self.scores = scores
 
     def __getitem__(self, key):
         if type(key) == tuple:
@@ -146,6 +147,8 @@ class BoxPlot:
                 return self.outliers[key[1]]
             elif key[0] in ('I', 'i', 'inside', 'backer'):
                 return self.backers[key[1]]
+            elif key[0] in ('D', 'd', 'data'):
+                return self.scores[key[1]]
             else:
                 raise KeyError
         elif key in ('B', 'b', 'L', 'l', 'bottom-whisker', 'lower-whisker'):

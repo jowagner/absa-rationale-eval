@@ -410,15 +410,15 @@ for domain in 'Laptop Restaurant Overall'.split():
 
     boxplots.append(('RND25', BoxPlot(
         get_cell_scores('tab4-RND25', 'tr=SE/R',       domain, 'SE/R' ) + \
-        get_cell_scores('tab4-RND75', 'tr=Z-CompSE/R', domain, 'Z-CompSE/R' ),
+        get_cell_scores('tab4-RND75', 'tr=Y_Other',    domain, 'Z-CompSE/R' ),
     )))
     boxplots.append(('RND50', BoxPlot(
         get_cell_scores('tab4-RND50', 'tr=SE/R',       domain, 'SE/R' ) + \
-        get_cell_scores('tab4-RND50', 'tr=Z-CompSE/R', domain, 'Z-CompSE/R' ),
+        get_cell_scores('tab4-RND50', 'tr=Y_Other',    domain, 'Z-CompSE/R' ),
     )))
     boxplots.append(('RND75', BoxPlot(
         get_cell_scores('tab4-RND75', 'tr=SE/R',       domain, 'SE/R' ) + \
-        get_cell_scores('tab4-RND25', 'tr=Z-CompSE/R', domain, 'Z-CompSE/R' ),
+        get_cell_scores('tab4-RND25', 'tr=Y_Other',    domain, 'Z-CompSE/R' ),
     )))
     boxplots.append(('Full', BoxPlot(
         get_cell_scores('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 4),
@@ -436,21 +436,22 @@ for domain in 'Laptop Restaurant Overall'.split():
             row.append('%.9f' %(boxplot[attr_name]))
         f.write('\t'.join(row))
         f.write('\n')
-    outlier_index = 0
-    while True:
-        found_outlier = False
-        row = []
-        row.append('O_%d' %(outlier_index + 1))
-        for bp_name, boxplot in boxplots:
-            try:
-                outlier = '%.9f' %(boxplot[('O', outlier_index)])
-                found_outlier = True
-            except IndexError:
-                outlier = ''
-            row.append(outlier)
-        if not found_outlier:
-            break
-        f.write('\t'.join(row))
-        f.write('\n')
-        outlier_index += 1
+    for d_code in 'OD':
+        outlier_index = 0
+        while True:
+            found_outlier = False
+            row = []
+            row.append('%s_%d' %(d_code, outlier_index + 1))
+            for bp_name, boxplot in boxplots:
+                try:
+                    outlier = '%.9f' %(boxplot[(d_code, outlier_index)])
+                    found_outlier = True
+                except IndexError:
+                    outlier = ''
+                row.append(outlier)
+            if not found_outlier:
+                break
+            f.write('\t'.join(row))
+            f.write('\n')
+            outlier_index += 1
     f.close()
