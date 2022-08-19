@@ -15,6 +15,10 @@ def get_median(values):
     n = len(values)
     if n > 2:
         values = sorted(values)
+    elif n == 1:
+        return values[0]
+    elif n == 0:
+        raise ValueError('cannot take median from an empty list')
     n2 = n // 2
     if n % 2 == 0:
         # even number of items
