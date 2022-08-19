@@ -402,7 +402,7 @@ for domain in 'Laptop Restaurant Overall'.split():
     if not include_domain_breakdown and domain != 'Overall':
         continue
     f = open('box-plot-full-rnd-none.tsv', 'wt')
-    
+
     boxplots = []
     boxplots.append(('None', BoxPlot(
         get_cell_scores('tab2-SE', 'tr=None', domain, 'None', extra_sets = 4),
@@ -422,6 +422,63 @@ for domain in 'Laptop Restaurant Overall'.split():
     )))
     boxplots.append(('Full', BoxPlot(
         get_cell_scores('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 4),
+    )))
+    header = []
+    header.append('Attribute')
+    for bp_name, _ in boxplots:
+        header.append(bp_name)
+    f.write('\t'.join(header))
+    f.write('\n')
+    for attr_name in 'B Q1 M Q3 T'.split():
+        row = []
+        row.append(attr_name)
+        for bp_name, boxplot in boxplots:
+            row.append('%.9f' %(boxplot[attr_name]))
+        f.write('\t'.join(row))
+        f.write('\n')
+    for d_code in 'OD':
+        outlier_index = 0
+        while True:
+            found_outlier = False
+            row = []
+            row.append('%s_%d' %(d_code, outlier_index + 1))
+            for bp_name, boxplot in boxplots:
+                try:
+                    outlier = '%.9f' %(boxplot[(d_code, outlier_index)])
+                    found_outlier = True
+                except IndexError:
+                    outlier = ''
+                row.append(outlier)
+            if not found_outlier:
+                break
+            f.write('\t'.join(row))
+            f.write('\n')
+            outlier_index += 1
+    f.close()
+
+    f = open('box-plot-gradient-based.tsv', 'wt')
+
+    boxplots = []
+    boxplots.append(('None', BoxPlot(
+        get_cell_scores('tab2-SE', 'tr=None', domain, 'None', extra_sets = 0),
+    )))
+
+    boxplots.append(('-PG75', BoxPlot(get_cell_scores('tab3-P75', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('-IG75', BoxPlot(get_cell_scores('tab3-L75', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('-PG50', BoxPlot(get_cell_scores('tab3-P50', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('-IG50', BoxPlot(get_cell_scores('tab3-L50', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('-PG25', BoxPlot(get_cell_scores('tab3-P25', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('-IG25', BoxPlot(get_cell_scores('tab3-L25', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+
+    boxplots.append(('PG25', BoxPlot( get_cell_scores('tab3-P25', 'tr=SE/R', domain, 'SE/R'))))
+    boxplots.append(('IG25', BoxPlot( get_cell_scores('tab3-L25', 'tr=SE/R', domain, 'SE/R'))))
+    boxplots.append(('PG50', BoxPlot( get_cell_scores('tab3-P50', 'tr=SE/R', domain, 'SE/R'))))
+    boxplots.append(('IG50', BoxPlot( get_cell_scores('tab3-L50', 'tr=SE/R', domain, 'SE/R'))))
+    boxplots.append(('PG75', BoxPlot( get_cell_scores('tab3-P75', 'tr=SE/R', domain, 'SE/R'))))
+    boxplots.append(('IG75', BoxPlot( get_cell_scores('tab3-L75', 'tr=SE/R', domain, 'SE/R'))))
+
+    boxplots.append(('Full', BoxPlot(
+        get_cell_scores('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 0),
     )))
     header = []
     header.append('Attribute')
