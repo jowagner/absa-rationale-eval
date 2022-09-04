@@ -337,7 +337,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                         map_enc = []
                         for t_index in range(len(tokens)):
                             rank = all_indices.index(t_index)  # 0 = most salient
-                            saliency_enc_index = (saliency_enc_size*t_index)//len(tokens)
+                            saliency_enc_index = (saliency_enc_size*rank)//len(tokens)
                             char = saliency_enc_alphabet[saliency_enc_index]
                             map_enc.append(char)
                         summary_file.write('map:\t%s\n' %(' '.join(map_enc)))
