@@ -11,6 +11,7 @@
 # based on https://marcotcr.github.io/lime/tutorials/Lime%20-%20multiclass.html
 
 import bz2
+from collections import defaultdict
 import hashlib
 import lime
 import numpy as np
@@ -377,6 +378,7 @@ def my_predict_proba(items):
     get_cache()
     masks = set()
     new = []
+    popcount_freq = defaultdict(lambda: 0)
     for item in items:
         mask = get_mask(item)
         row2mask.append(mask)
@@ -384,6 +386,7 @@ def my_predict_proba(items):
             masks.add(mask)
             if mask not in cache:
                 new.append((item, mask))
+        popcount_freq[bin(mask).count('1')] += 1
     after_dedup = len(masks)
     cache_miss  = len(new)
     assert after_dedup > 0
@@ -393,6 +396,9 @@ def my_predict_proba(items):
         100.0*cache_miss/float(total),
         100.0*cache_miss/float(after_dedup),
     ))
+    if opt_verbose:
+        for popcount in sorted(list(popcount_freq.keys())):
+            print('# %d item(s) with %d mask(s)\n' %(popcount_freq[popcount], popcount))
     if cache_miss and opt_abort_on_cache_miss:
         print('# aborting as --abort-on-cache-miss was specified')
         sys.exit(1)
