@@ -377,17 +377,16 @@ def my_predict_proba(items):
     get_cache()
     masks = set()
     new = []
-    after_dedup = 0
-    cache_miss = 0
     for item in items:
         mask = get_mask(item)
         row2mask.append(mask)
         if mask not in masks:
-            after_dedup += 1
+            masks.add(mask)
             if mask not in cache:
-                cache_miss += 1
                 new.append((item, mask))
-                masks.add(mask)
+    after_dedup = len(masks)
+    cache_miss  = len(new)
+    assert after_dedup > 0
     if opt_verbose: print('# %d item(s) after deduplication' %after_dedup)
     if opt_verbose: print('# %d unique items (%.1f%% raw, %.1f%% dedup) not in cache' %(
         cache_miss,
