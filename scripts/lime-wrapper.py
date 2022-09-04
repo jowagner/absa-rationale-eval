@@ -398,7 +398,7 @@ def my_predict_proba(items):
     ))
     if opt_verbose:
         for popcount in sorted(list(popcount_freq.keys())):
-            print('# %d item(s) with %d mask(s)\n' %(popcount_freq[popcount], popcount))
+            print('# %d item(s) with %d mask(s)' %(popcount_freq[popcount], popcount))
     if cache_miss and opt_abort_on_cache_miss:
         print('# aborting as --abort-on-cache-miss was specified')
         sys.exit(1)
