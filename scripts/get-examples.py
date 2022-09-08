@@ -11,10 +11,61 @@
 import random
 import sys
 
-selected_length = 'L50'
-n_examples = 25
+def usage():
+    print('Usage: cat t*-*-M50-wcloud.tsv | $0 [options]')
+    # TODO: print more details how to use this script
 
-example = """
+    # note P50-wcloud.tsv still uses L50 prefix
+
+selected_aio = 'M50'
+selected_set = 'training'
+n_examples   = 15
+treat_dev_as_training = True
+unshuffled   = True
+seed         = None
+debug        = False
+
+while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h', '-n'):
+    option = sys.argv[1].replace('_', '-')
+    del sys.argv[1]
+    if option in ('-h', '--help'):
+        usage()
+        sys.exit(0)
+    elif option == '--debug':
+        debug = True
+    elif option == '--exclude-dev-from-training':
+        treat_dev_as_training = False
+    elif option in ('--shuffle', '--randomise-order'):
+        unshuffled = False
+    elif option in ('--set', '--set-type'):
+        selected_set = sys.argv[1]
+        if selected_set.lower() in ('any', 'both', 'none'):
+            selected_set = None
+        del sys.argv[1]
+    elif option == '--aio':
+        selected_aio = sys.argv[1]
+        del sys.argv[1]
+    elif option in ('-n', '--num-examples', '--number-of-examples'):
+        n_examples = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--seed', '--random-seed'):
+        seed = sys.argv[1]
+        unshuffled = False   # --seed implies --shuffle
+        del sys.argv[1]
+        if seed == '0':
+            # 0 = use system default
+            seed = None
+            if debug: sys.stderr.write('PRNG using system seed\n')
+    else:
+        print('Unknown option', option)
+        usage()
+        sys.exit(1)
+
+if len(sys.argv) > 1:
+    usage()
+    sys.exit(1)
+
+example_input = """
 L50             laptop          training        1:0:0           All             I               O
 L50             laptop          training        1:0:0           I               O               O
 L50             laptop          training        1:0:0           can             I               O
@@ -62,8 +113,14 @@ while True:
             break
         continue
     fields = line.rstrip().split('\t')
-    if fields[0] != selected_length:
+    if fields[0] != selected_aio:
         continue
+    if selected_set:
+        current_set = fields[2]
+        if treat_dev_as_training and current_set == 'dev':
+            current_set = 'training'
+        if current_set != selected_set:
+            continue
     if current_id:
         assert current_id == fields[3]
         assert current_domain == fields[1]
@@ -75,13 +132,40 @@ while True:
 def latex_text(s):
     s = s.replace('%', '\\%')
     s = s.replace('"', "''")
+    s = s.replace('$', '\\$')
     return s
 
 for domain in sorted(list(domain2info.keys())):
-    sys.stdout.write('%% subsection{%s Domain}\n' %(domain.title()))
+    sys.stdout.write('\\subsubsection{%s Domain} %% %s\n' %(
+        domain.title(), selected_aio
+    ))
     sid2items = domain2info[domain]
     sid_keys = list(sid2items.keys())
-    random.shuffle(sid_keys)
+    if debug: sys.stderr.write('%d sentence IDs for %s domain\n' %(len(sid_keys), domain))
+    if seed or unshuffled:
+        sid_keys.sort()
+    if seed:
+        domain_seed = '%s:%s' %(domain, seed)
+        import hashlib
+        if type(b'') is not str:
+            # Python 3
+            domain_seed = domain_seed.encode('UTF-8')
+        # convert string to int consistently across Python versions
+        if debug: sys.stderr.write('Hashing string %r with %d bytes derived from (%s, %s)\n' %(domain_seed, len(domain_seed), domain, seed))
+        numeric_seed = int(hashlib.sha512(domain_seed).hexdigest(), 16)
+        if debug: sys.stderr.write('Domain and seed hashed to %d\n' %numeric_seed)
+        random.seed(numeric_seed)
+    if not unshuffled:
+        if debug:
+            rng_state = random.getstate()
+            rnd = [random.random(), random.random(), random.random()]
+            test_seq = [1,2,3,4,5,6,7,8]
+            random.shuffle(test_seq)
+            rnd.append(test_seq)
+            rnd = tuple(rnd)
+            sys.stderr.write('%.3f %.3f %.3f %r\n' %rnd)
+            random.setstate(rng_state)
+        random.shuffle(sid_keys)
     examples_printed = 0
     is_first = True
     for sid_key in sid_keys:

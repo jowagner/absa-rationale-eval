@@ -283,10 +283,9 @@ for domain, maj_acc, baseline_acc in [
 f.write(r"""    \end{tabular}
     \caption{Test set accuracy (percentages; average and standard deviation over at least twelve runs)
              and effect of restricting input to
-             random tokens (R\textsubscript{RAND}),
-             rationales based on absolute point gradients (\rPG{}),
-             rationales based on absolute LIME scores (\rLA{}),
-             rationales based on plain    LIME scores (\rLP{}),
+             random tokens (\rRAND{}),
+             gradient-based rationales  (\rPG{}),
+             LIME-based rationales (\rLA{}),
              SEs,
              the union of all SEs where a sentence has multiple opinions (U-SE),
              and

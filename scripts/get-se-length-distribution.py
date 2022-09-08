@@ -113,6 +113,7 @@ def incr_bin(bins, index):
         bins.append(0)
     bins[index] += 1
 
+dataset_size = 0
 for domain in domains:
     drlen_counts = []
     dspan_counts = []
@@ -132,11 +133,24 @@ for domain in domains:
         incr_bin(drlen_counts, rlen_bin)
         incr_bin(span_counts, n_spans)
         incr_bin(dspan_counts, n_spans)
+        dataset_size += 1
     domain2rlen_counts[domain] = drlen_counts
     domain2span_counts[domain] = dspan_counts
+
+print('Dataset size', dataset_size)
 
 print(rlen_counts)
 print(span_counts)
 for domain in domains:
-    print(domain, domain2rlen_counts[domain])
-    print(domain, domain2span_counts[domain])
+    print('rlen', domain, domain2rlen_counts[domain])
+    print('span', domain, domain2span_counts[domain])
+
+print('Overall span counts:')
+for i in range(100):
+    total = 0
+    for domain in domains:
+        try:
+            total += domain2span_counts[domain][i]
+        except IndexError:
+            pass
+    print(i, total) # , '%.1f%%' %(100.0 * total / float(dataset_size)))

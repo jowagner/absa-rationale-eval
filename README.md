@@ -77,19 +77,27 @@ with `--dev-and-test-saliencies-only`, speeding up the process about 4x.
 
 ## Length Oracle
 
-1. SE agreement statistics for rationales with gold length are included in the `saliency-morewio-xfw-stdout.txt` log files.
-2. `get-length-oracle-scores.sh`
+SE agreement statistics for rationales with gold length are included in the `saliency-onepoint-xfw-stdout.txt` log files for gradient-based rationales and `lime-M-fscores-te.txt for LIME-based rationales.
+
+Run
+```
+for I in c-s-[1234]-? ; do scripts/get-se-length-distribution.py --aio-prefix $I/local-aio-M50/ test | fgrep "Overall span counts" -A 999 > $I/span-counts-M50.txt ; done
+for I in c-s-[1234]-? ; do scripts/get-se-length-distribution.py --aio-prefix $I/local-aio-P50/ test | fgrep "Overall span counts" -A 999 > $I/span-counts-P50.txt ; done
+paste c-s-*/span-counts-P50.txt
+paste c-s-*/span-counts-M50.txt
+```
+to obtain span counts for all 12 runs. Remove columns 3, 5, 7, etc. in a spreadsheet, get row totals (without column 1) and get percentages.
 
 
 ## Sentence Length Distribution
 
-`get-se-length-distribution.py`
-for Figure 2
+Run `scripts/get-se-length-distribution.py --aio-prefix data/ test`
+and add the `rlen` vectors for each domain to obtain overall counts for Figure 4.
 
 
 ## Confusion Matrices
 
-`get-confusion-matrices.py`
+Run `get-confusion-matrices.py`.
 We used the output to find out that 3.1% of test instances can be predicted correctly
 as neutral by the SE models simply based on not the fact that these many test instances have zero SE tokens and
 are neutral.
@@ -99,12 +107,27 @@ are neutral.
 
 1. Check that the c-f-?-? folders contain `-wcloud.tsv` files for the desired setting. Modify and re-run `extract-aio.sh` as needed. Default is to produce word clouds for R@.5 only.
 2. Install https://github.com/amueller/word_cloud e.g. with `pip install wordcloud`
-3. Run `word-clouds.shword-clouds.sh`
+3. Run `word-clouds.sh P` to produce word clouds for gradient-based rationales
+3. Run `word-clouds.sh M` to produce word clouds for LIME-based rationales
+
+Appendix tables for word clouds:
+`gen-word-count-tables.py` expects to be run in a folder containing 4 files with the pattern `top-words-for-r-is-[io]-and-se-is-[io].tsv`.
+These should be in the `wc-P` and `wc-M` folder of the word cloud files.
+
 
 
 ## Get Examples with Sentiment Expressions and Rationales
 
-`get-examples.py`
+```
+cat c-f-1-1/t*-*-P50-wcloud.tsv | scripts/get-examples.py --seed 101 --aio L50  > examples-grad-shuffled.tex
+cat c-f-1-1/t*-*-M50-wcloud.tsv | scripts/get-examples.py --seed 101 --aio M50  > examples-lime-shuffled.tex
+cat c-f-1-1/t*-*-P50-wcloud.tsv | scripts/get-examples.py --aio L50  > examples-grad-ordered.tex
+cat c-f-1-1/t*-*-M50-wcloud.tsv | scripts/get-examples.py --aio M50  > examples-lime-ordered.tex
+```
+
+Note that the shuffling differs between Python 2 and 3 (starting with version 3.2 according to
+https://stackoverflow.com/questions/38943038/difference-between-python-2-and-3-for-shuffle-with-a-given-seed).
+We use Python 3 to ease reproduction of results.
 
 
 ## Citation
