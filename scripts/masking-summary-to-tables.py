@@ -15,11 +15,14 @@ from quartiles import BoxPlot
 opt_show_stddev_in_appendix = False
 opt_number_of_sets = 4   # see also `extra_sets` parameter used below
 opt_runs_per_set = 3
+opt_show_all_lime_methods = False
 
 include_domain_breakdown = False
 if len(sys.argv) > 1:
     if len(sys.argv) == 2 and sys.argv[1] in ('--include-domain-breakdown', '--domains'):
         include_domain_breakdown = True
+    if len(sys.argv) == 2 and sys.argv[1] in ('--show-all-lime-methods', '--lime'):
+        opt_show_all_lime_methods = True
     else:
         raise ValueError('unsupported option(s)')
 
@@ -199,13 +202,13 @@ for domain, maj_acc, baseline_acc in [
         f.write(r"""    \multicolumn{3}{l}{} \\
 """)
     is_first = False
-    f.write(r'    \textbf{Full}                      & ')
+    f.write(r'    \textbf{Full}         & ')
     f.write(get_cell_content('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 4))
-    f.write(r' & \textbf{None}                            & ')
+    f.write(r' & \textbf{None}               & ')
     f.write(get_cell_content('tab2-SE', 'tr=None', domain, 'None', extra_sets = 4))
     f.write(r' \\')
     f.write('\n')
-    for m_type, mask_title_left in [
+    for row_spec in [
         ('tab4-RND25',  '\\rRAND{}@.25'),
         ('tab4-RND50',  '\\rRAND{}@.5'),
         ('tab4-RND75',  '\\rRAND{}@.75'),
@@ -221,27 +224,27 @@ for domain, maj_acc, baseline_acc in [
         ('tab3-P50',  '\\rPG{}@.5'),
         ('tab3-P75',  '\\rPG{}@.75'),
         (None, r'\hline'),
-        #(None, r'\hline'),
-        #(None, r'\multicolumn{4}{l}{LIME with 10k samples, abs score of predicted class} \\'),
+        ('LIME-extra', None, r'\hline'),
+        ('LIME-extra', None, r'\multicolumn{4}{l}{LIME with 10k samples, abs score of predicted class} \\'),
         ('tab3-M25',  '\\rLIME{}@.25'),
         ('tab3-M50',  '\\rLIME{}@.5'),
         ('tab3-M75',  '\\rLIME{}@.75'),
-        #(None, r'\hline'),
-        #(None, r'\multicolumn{4}{l}{LIME with 10k samples, plain score of predicted class} \\'),
-        #('tab3-N25',  'R\\textsubscript{LIME}@.25'),
-        #('tab3-N50',  'R\\textsubscript{LIME}@.5'),
-        #('tab3-N75',  'R\\textsubscript{LIME}@.75'),
-        #(None, r'\hline'),
-        #(None, r'\hline'),
-        #(None, r'\multicolumn{4}{l}{LIME with 10k samples, max(abs(s1),abs(s2),abs(s3))} \\'),
-        #('tab3-X25',  'R\\textsubscript{LIME}@.25'),
-        #('tab3-X50',  'R\\textsubscript{LIME}@.5'),
-        #('tab3-X75',  'R\\textsubscript{LIME}@.75'),
-        #(None, r'\hline'),
-        #(None, r'\multicolumn{4}{l}{LIME with 10k samples, any support for predicted class} \\'),
-        #('tab3-S25',  'R\\textsubscript{LIME}@.25'),
-        #('tab3-S50',  'R\\textsubscript{LIME}@.5'),
-        #('tab3-S75',  'R\\textsubscript{LIME}@.75'),
+        ('LIME-extra', None, r'\hline'),
+        ('LIME-extra', None, r'\multicolumn{4}{l}{LIME with 10k samples, plain score of predicted class} \\'),
+        ('LIME-extra', 'tab3-N25',  '\\rLIME{}@.25'),
+        ('LIME-extra', 'tab3-N50',  '\\rLIME{}@.5'),
+        ('LIME-extra', 'tab3-N75',  '\\rLIME{}@.75'),
+        ('LIME-extra', None, r'\hline'),
+        ('LIME-extra', None, r'\hline'),
+        ('LIME-extra', None, r'\multicolumn{4}{l}{LIME with 10k samples, max(abs(s1),abs(s2),abs(s3))} \\'),
+        ('LIME-extra', 'tab3-X25',  '\\rLIME{}@.25'),
+        ('LIME-extra', 'tab3-X50',  '\\rLIME{}@.5'),
+        ('LIME-extra', 'tab3-X75',  '\\rLIME{}@.75'),
+        ('LIME-extra', None, r'\hline'),
+        ('LIME-extra', None, r'\multicolumn{4}{l}{LIME with 10k samples, any support for predicted class} \\'),
+        ('LIME-extra', 'tab3-S25',  '\\rLIME{}@.25'),
+        ('LIME-extra', 'tab3-S50',  '\\rLIME{}@.5'),
+        ('LIME-extra', 'tab3-S75',  '\\rLIME{}@.75'),
         (None, r'\hline'),
         (None, r'\hline'),
         ('tab2-SE',   'SE'),
@@ -249,6 +252,15 @@ for domain, maj_acc, baseline_acc in [
         (None, r'\hline'),
         (None, r'\hline'),
     ]:
+        if len(row_spec) == 2:
+            m_type, mask_title_left = row_spec
+        elif len(row_spec) == 3 \
+        and row_spec[0] == 'LIME-extra':
+            if not opt_show_all_lime_methods:
+                continue
+            m_type, mask_title_left = row_spec[1:]
+        else:
+            raise ValueError('unexpected row spec')
         f.write('    ')
         if not m_type:
             # print special line
@@ -265,10 +277,10 @@ for domain, maj_acc, baseline_acc in [
             (False, 'tr=Y_Other', 'Z-CompSE/R', '$\\neg$' + mask_title_left),
         ]:
             if not is_first_column:
-                col_width = 32
+                col_width = 19
                 f.write('& ')
             else:
-                col_width = 26
+                col_width = 13
             gap = (col_width - len(mask_title)) * ' '
             f.write(r'\textbf{%s}%s' %(mask_title, gap))
             f.write(r'& %s ' %get_cell_content(
