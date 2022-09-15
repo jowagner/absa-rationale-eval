@@ -29,6 +29,8 @@ opt_normalise  = False   # should have no effect on rationales as it does not ch
 opt_classes    = 'negative neutral positive'.split()
 data_prefix    = 'data/'
 opt_write_fscores = True
+opt_write_features = True
+opt_v_length       = 8
 opt_exclude_function_words = True
 saliency_enc_alphabet = 'Ii_oO'
 
@@ -65,6 +67,8 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         opt_exclude_function_words = False
     elif option == '--no-fscores':
         opt_write_fscores = None
+    elif option == '--no-features':
+        opt_write_features = False
     elif option == '--no-wordcloud':
         opt_wordcloud = None
     elif option == '--wordcloud-length':
@@ -78,7 +82,8 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
 if opt_wordcloud is not None:
     assert opt_wordcloud in opt_r_lengths
 
-if opt_write_fscores and not opt_r_lengths:
+if (opt_write_fscores or opt_write_features) \
+and not opt_r_lengths:
     opt_r_lengths.append(None)
 
 def abs_score_of_predicted_class(scores, probs, pred_index):
@@ -113,8 +118,22 @@ def get_seed(workdir):
             pass
     return workdir
 
+
 if opt_write_fscores:
     seed = get_seed(opt_workdir)
+
+def encode(text, v_length):
+    retval = []
+    text = text.encode('UTF-8')
+    for v_index in range(v_length):
+        h = hashlib.sha256()
+        h.update(b'%d:' %len(text))
+        h.update(v_index * b'_')
+        h.update(text)
+        h.update(b':%d' %v_index)
+        data64 = h.hexdigest()[:16]
+        retval.append(float(int(data64, 16)) / 2.0 ** 64)
+    return retval
 
 function_words = evaluation.init_function_words(data_prefix)
 
@@ -127,7 +146,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
     ]):
         rationale_code, score_func = score_func_tuple
         for rl_index, rel_length in enumerate(opt_r_lengths):
-            # for test sets we may want to write a f-score summary
+            # for test sets we may want to write an f-score summary
             # (only for the first rationale length as the summary
             # is independent of the aio file's rationale length)
             if opt_write_fscores \
@@ -150,6 +169,14 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
             else:
                 summaries    = None
                 summary_file = None
+
+            if opt_write_features \
+            and rl_index == 0     \
+            and sf_index == 0:
+                path = '%(opt_workdir)s/lime-features-%(set_code)s.tsv' %locals()
+                feature_file = open(path, 'wt')
+            else:
+                feature_file = None
 
             cross_domain_item_count = 0
 
@@ -187,6 +214,8 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                     tokens = None
                     item_domain = None
                     opinion_id = None
+                    entity_type = None
+                    attribute_label = None
                     sea = None
                     while True:
                         line = score_file.readline()
@@ -200,11 +229,17 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                             item_domain = line[7:].rstrip()
                         elif line.startswith('opinion_id '):
                             opinion_id = line[11:].rstrip()
+                        elif line.startswith('entity_type '):
+                            entity_type = line[12:].rstrip()
+                        elif line.startswith('attribute_label '):
+                            attribute_label = line[16:].rstrip()
                         elif line.startswith('sea '):
                             sea = line[4:].split()
                     assert tokens
                     assert item_domain
                     assert opinion_id
+                    assert entity_type
+                    assert attribute_label
                     assert sea
                     # read prediction and scores,
                     # skip comments and explanations
@@ -255,14 +290,106 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                         if scores:
                             break
                     # all information ready for this item
-                    assert len(scores) == len(tokens)
+                    n_tokens = len(tokens)
+                    assert len(scores) == n_tokens
                     if item_domain != domain:
                         # skip items with different domain than we are
                         # looking for in this iteration
                         item_index += 1
                         continue
+                    p_index = opt_classes.index(prediction)  # 0 = negative, 1 = neutral etc.
+                    if feature_file is not None:
+                        # write features for this item
+                        assert set_long_name in ('training', 'test')
+                        key2scores = {}
+                        for lime_code, score_func2 in [
+                            ('M', abs_score_of_predicted_class),
+                            ('N', scaled_score_of_predicted_class),
+                            ('S', support_for_predicted_class),
+                            ('X', maximum_of_absolute_scores),
+                        ]:
+                            mapped_scores = []
+                            mapped_scores_with_rank = []
+                            total = 0.0
+                            for t_index in range(n_tokens):
+                                mapped_score = score_func2(
+                                    scores[t_index], probs, p_index
+                                )
+                                mapped_scores.append(mapped_score)
+                                mapped_scores_with_rank.append((mapped_score, t_index))
+                                total += mapped_score
+                            if abs(total) < 0.000001:  # total == 0.0 has been observed
+                                normalised_scores = mapped_scores
+                                is_normalised = False
+                            else:
+                                normalised_scores = []
+                                for t_index in range(n_tokens):
+                                    normalised_scores.append(
+                                        mapped_scores[t_index] / total
+                                    )
+                                is_normalised = True
+                            mapped_scores_with_rank.sort(reverse = True)
+                            all_indices = list(map(lambda x: x[-1], mapped_scores_with_rank))
+                            key2scores[lime_code] = (mapped_scores, normalised_scores, is_normalised, all_indices)
+                        header = '#L0 L1 L2'.split()
+                        for lime_code in 'MNSX':
+                            header.append('%s_score' %lime_code)
+                            header.append('%s_norm' %lime_code)
+                            header.append('%s_is_n' %lime_code)
+                            header.append('%s_rank' %lime_code)
+                            header.append('%s_revr' %lime_code)
+                            header.append('%s_relr' %lime_code)
+                        # features that are not useful as context
+                        for nc_feature in 't_idx rv_idx relpos p0 p1 p2 pred confid domain set'.split():
+                            header.append(nc_feature)
+                        for nc_vec_feature in 'etyp attr'.split():
+                            for v_index in range(opt_v_length):
+                                header.append('%s%d' %(nc_vec_feature, v_index))
+                        header.append('SEA')
+                        header.append('token')
+                        header.append('item_ID (do not use as a feature)')
+                        feature_file.write('\t'.join(header))
+                        feature_file.write('\n')
+                        for t_index, token in enumerate(tokens):
+                            row = []
+                            row.append('%.9f' %(scores[t_index][0]))
+                            row.append('%.9f' %(scores[t_index][1]))
+                            row.append('%.9f' %(scores[t_index][2]))
+                            for lime_code in 'MNSX':
+                                row.append('%.9f' %(key2scores[lime_code][0][t_index]))
+                                row.append('%.9f' %(key2scores[lime_code][1][t_index]))
+                                is_normalised = key2scores[lime_code][2]
+                                row.append('1' if is_normalised else '0')
+                                rank = key2scores[lime_code][3][t_index]
+                                row.append('%d' %rank)
+                                row.append('%d' %(n_tokens-1-rank))
+                                row.append('%.9f' %(rank/float(n_tokens)))
+                            row.append('%d' %t_index)
+                            row.append('%d' %(n_tokens-1-t_index))
+                            row.append('%.9f' %(t_index/float(n_tokens)))
+                            row.append('%.9f' %(probs[0]))
+                            row.append('%.9f' %(probs[1]))
+                            row.append('%.9f' %(probs[2]))
+                            row.append('%d'   %p_index)
+                            row.append('%.9f' %(probs[p_index]))
+                            row.append('%d' %(opt_domains.index(domain)))
+                            row.append('0' if set_long_name == 'training' else '1')
+                            # encode entity type and attribute label
+                            for to_be_encoded in (entity_type, attribute_label):
+                                encoded = encode(to_be_encoded, opt_v_length)
+                                for v_index in range(opt_v_length):
+                                    row.append('%.9f' %(encoded[v_index]))
+                            # SEA target feature
+                            row.append('0' if sea[t_index] == 'O' else '1')
+                            # non-numerical features
+                            row.append(token)
+                            # item ID (do not use as feature)
+                            row.append(opinion_id)
+                            feature_file.write('\t'.join(row))
+                            feature_file.write('\n')
+                        feature_file.write('\n')
+
                     # get saliency scores from LIME scores and prediction
-                    p_index = opt_classes.index(prediction)
                     saliency_scores = []
                     for index in range(len(scores)):
                         score = score_func(scores[index], probs, p_index)
@@ -310,14 +437,6 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                             row.append(token)
                             row.append(tag)
                             row.append(sea[t_index])
-                            #for _, score_func2 in [
-                            #    ('M', abs_score_of_predicted_class),
-                            #    ('N', scaled_score_of_predicted_class),
-                            #    ('S', support_for_predicted_class),
-                            #    ('X', maximum_of_absolute_scores),
-                            #]:
-                            #    row.append('%.9f' %score_func2(scores[t_index], probs, p_index))
-                            #sys.stderr.write('item %d token %d wc: %r\n' %(item_index, t_index, row))
                             wcloud_file.write('\t'.join(row))
                             wcloud_file.write('\n')
                     if aio_file is not None:
@@ -382,4 +501,6 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
 
             if summary_file is not None:
                 summary_file.close()
+            if feature_file is not None:
+                feature_file.close()
 
