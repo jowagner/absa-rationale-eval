@@ -25,10 +25,16 @@ opt_workdir = sys.argv[1]
 opt_folds   = int(sys.argv[2])
 opt_leaf_size = int(sys.argv[3])
 opt_seed_for_data_split = 101
+opt_viz_tree = False
 
 opt_training_data = os.path.join(opt_workdir, 'lime-features-tr.tsv')
 opt_test_data     = os.path.join(opt_workdir, 'lime-features-te.tsv')
 
+if opt_viz_tree:
+    from dtreeviz.trees import dtreeviz
+    max_depth = 6
+else:
+    max_depth = 20
 
 class IODataset:
 
@@ -56,6 +62,10 @@ class IODatasetSubset(IODataset):
         self.dataset = dataset
         self.data    = indices
         self.sea_column = dataset.sea_column
+        try:
+            self.feature_names = dataset.feature_names
+        except:
+            pass
 
     def __getitem__(self, index):
         return self.dataset[self.data[index]]
@@ -130,14 +140,17 @@ class IODatasetFromFile(IODatasetGrouped):
         self.groups2indices = sent2indices
         self.data = data
         self.sea_column = sea_column
+        self.feature_names = header[:sea_column]
 
 overall_tr_dataset = IODatasetFromFile(opt_training_data)
 overall_te_dataset = IODatasetFromFile(opt_test_data)
 
-#random.seed(opt_seed_for_data_split)
+random.seed(opt_seed_for_data_split)
+
 
 correct = 0
 total   = 0
+fold    = 0
 for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
     print('Fold with %d training items and %d test items' %(
         len(tr_dataset), len(te_dataset)
@@ -145,17 +158,27 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
     # train model for this fold
     features, targets = tr_dataset.get_sklearn_data()
     model = DecisionTreeClassifier(
-        max_depth = 20,
+        max_depth = max_depth,
         min_samples_leaf  = opt_leaf_size,
         random_state = 101,
     )
     model.fit(features, targets)
+    if opt_viz_tree:
+        dtreeviz(model, features, targets,
+                 target_name='SE-IO-tag',
+                 feature_names = tr_dataset.feature_names,
+                 class_names = 'O I'.split(),
+       ).save('dt-%d-%d-%d-%d.svg' %(max_depth, opt_leaf_size, opt_folds, fold))
     te_features, te_gold_labels = te_dataset.get_sklearn_data()
     predictions = model.predict(te_features)
     for i in range(len(te_gold_labels)):
         if te_gold_labels[i] == predictions[i]:
             correct += 1
     total += len(te_gold_labels)
-print('Average accuracy: %.2f%%' %(100.0* correct / float(total)))
+    fold += 1
+    if opt_viz_tree:
+        break
+if not opt_viz_tree:
+    print('Average accuracy: %.2f%%' %(100.0* correct / float(total)))
 
 
