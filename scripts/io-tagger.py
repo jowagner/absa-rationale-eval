@@ -22,8 +22,8 @@ def usage():
     # TODO: print more details how to use this script
 
 opt_workdir = sys.argv[1]
-opt_folds   = int(sys.argv[2])
-opt_leaf_size = int(sys.argv[3])
+opt_folds   = 20
+opt_leaf_size = 1376
 opt_seed_for_data_split = 101
 opt_viz_tree = False
 
@@ -145,7 +145,10 @@ class IODatasetFromFile(IODatasetGrouped):
 overall_tr_dataset = IODatasetFromFile(opt_training_data)
 overall_te_dataset = IODatasetFromFile(opt_test_data)
 
-random.seed(opt_seed_for_data_split)
+if opt_seed_for_data_split:
+    random.seed(opt_seed_for_data_split)
+else:
+    print('Using system\'s random initialisation')
 
 
 correct = 0
