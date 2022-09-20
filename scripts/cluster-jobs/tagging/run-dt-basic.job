@@ -1,0 +1,23 @@
+#!/bin/bash
+  
+#SBATCH -p compute       # which partition to run on
+#SBATCH -J absa-2h    # name for the job
+#SBATCH --mem=47000
+#SBATCH --cpus-per-task=24
+#SBATCH --ntasks=1
+#SBATCH -N 1-1
+
+
+PRJ_DIR=${HOME}/sentiment/absa-rationale-eval
+cd $PRJ_DIR
+source venv-pytorch/bin/activate
+
+for SET in 1 2 3 4; do
+for RUN in 1 2 3 ; do
+    MODEL_DIR=c-f-${SET}-${RUN}
+    scripts/io-tagger.py $MODEL_DIR &
+    sleep 2
+done
+done
+
+wait
