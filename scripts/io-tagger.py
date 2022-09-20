@@ -26,6 +26,8 @@ opt_folds   = 20
 opt_leaf_size = 1376
 opt_seed_for_data_split = 101
 opt_viz_tree = False
+domains = 'laptop restaurant'.split()
+labels  = 'O I'.split()
 
 opt_training_data = os.path.join(opt_workdir, 'lime-features-tr.tsv')
 opt_test_data     = os.path.join(opt_workdir, 'lime-features-te.tsv')
@@ -61,6 +63,7 @@ class IODatasetSubset(IODataset):
     def __init__(self, dataset, indices):
         self.dataset = dataset
         self.data    = indices
+        self.header  = dataset.header
         self.sea_column = dataset.sea_column
         try:
             self.feature_names = dataset.feature_names
@@ -139,8 +142,13 @@ class IODatasetFromFile(IODatasetGrouped):
         f.close()
         self.groups2indices = sent2indices
         self.data = data
+        self.header = header
         self.sea_column = sea_column
         self.feature_names = header[:sea_column]
+
+def mhash(text, n):
+    h = hashlib.sha512(text.encode('UTF-8'))
+    return int(h.hexdigest(), 16) % n
 
 overall_tr_dataset = IODatasetFromFile(opt_training_data)
 overall_te_dataset = IODatasetFromFile(opt_test_data)
@@ -154,6 +162,9 @@ else:
 correct = 0
 total   = 0
 fold    = 0
+token_column = None
+group2data = {}
+
 for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
     print('Fold with %d training items and %d test items' %(
         len(tr_dataset), len(te_dataset)
@@ -170,7 +181,7 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
         dtreeviz(model, features, targets,
                  target_name='SE-IO-tag',
                  feature_names = tr_dataset.feature_names,
-                 class_names = 'O I'.split(),
+                 class_names = labels,
        ).save('dt-%d-%d-%d-%d.svg' %(max_depth, opt_leaf_size, opt_folds, fold))
     te_features, te_gold_labels = te_dataset.get_sklearn_data()
     predictions = model.predict(te_features)
@@ -178,10 +189,68 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
         if te_gold_labels[i] == predictions[i]:
             correct += 1
     total += len(te_gold_labels)
-    fold += 1
     if opt_viz_tree:
         break
-if not opt_viz_tree:
-    print('Average accuracy: %.2f%%' %(100.0* correct / float(total)))
+    # store predictions by sentence ID
+    id_column = tr_dataset.header.index('item_ID')
+    domain_column = tr_dataset.header.index('domain')
+    if token_column is None:
+        token_column = tr_dataset.header.index('token')
+        rv_idx_column = tr_dataset.header.index('rv_idx')
+    else:
+        assert token_column == tr_dataset.header.index('token')
+        assert rv_idx_column == tr_dataset.header.index('rv_idx')
+    # (1) training data: use predictions for the test fold
+    for index, item in enumerate(te_dataset):
+        item_id = item[id_column].split(':')
+        review_id = item_id[0]
+        sent_idx  = int(item_id[1])
+        domain = domains[int(item[domain_column])]
+        group_key = ('tr', domain, review_id, sent_idx)
+        if group_key not in group2data:
+            group2data[group_key] = []
+        group2data[group_key].append((item, predictions[index]))
+    # (2) overall test data: assign fold to use by hash of sentence_id
+    overall_te_features, _ = overall_te_dataset.get_sklearn_data()
+    predictions = model.predict(overall_te_features)
+    for index, item in enumerate(overall_te_dataset):
+        item_id = item[id_column].split(':')
+        review_id = item_id[0]
+        sent_idx  = int(item_id[1])
+        domain = domains[int(item[domain_column])]
+        sent_id = '%s:%s:%d' %(domain, review_id, sent_idx)
+        if mhash(sent_id, opt_folds) != fold:
+            continue
+        group_key = ('te', domain, review_id, sent_idx)
+        if group_key not in group2data:
+            group2data[group_key] = []
+        group2data[group_key].append((item, predictions[index]))
+    fold += 1
 
+if not opt_viz_tree:
+    print('Cross-validation accuracy: %.2f%%' %(100.0* correct / float(total)))
+    # write aio files
+    assert token_column is not None
+    sorted_group_keys = sorted(list(group2data.keys()))
+    for domain in domains:
+        for set_type, long_set_name in [
+            ('tr', 'training'),
+            ('te', 'test'),
+        ]:
+            f = open(
+                os.path.join(opt_workdir, '%s-%s-TG1.aio' %(long_set_name, domain)),
+                'wt'
+            )
+            for group_key in sorted_group_keys:
+                if group_key[0] != set_type \
+                or group_key[1] != domain:
+                    continue
+                for item, prediction in group2data[group_key]:
+                    token = item[token_column]
+                    rv_idx = item[rv_idx_column]
+                    label = labels[prediction]
+                    f.write('%s\t%s\n' %(token, label))
+                    if rv_idx == '0':  # last token of sentence
+                        f.write('\n')
+            f.close()
 
