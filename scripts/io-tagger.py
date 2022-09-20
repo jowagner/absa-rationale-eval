@@ -234,7 +234,7 @@ if not opt_viz_tree:
     sorted_group_keys = sorted(list(group2data.keys()))
     for domain in domains:
         for set_type, long_set_name in [
-            ('tr', 'training'),
+            ('tr', 'train'),
             ('te', 'test'),
         ]:
             f = open(
