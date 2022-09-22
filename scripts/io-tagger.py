@@ -81,9 +81,9 @@ assert 1 <= tagger_version <= 4
 
 tagger_version_to_default_leaf_size = {
     1: 1376,  # DT with per-token features
-    2:  250,  # DT with context features   # TODO: tune
+    2:  399,  # DT with context features
     3:   17,  # RF with per-token features
-    4:   11,  # RF with context features   # TODO: tune
+    4:   13,  # RF with context features
 }
 
 if opt_leaf_size is None:
