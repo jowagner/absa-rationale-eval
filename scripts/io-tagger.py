@@ -38,6 +38,9 @@ if opt_viz_tree:
 else:
     max_depth = 20
 
+# TODO: allow above setting to be changed from the command line
+
+
 class IODataset:
 
     def __len__(self):
@@ -178,9 +181,15 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
     )
     model.fit(features, targets)
     if opt_viz_tree:
+        feature_names = '\t'.join(tr_dataset.feature_names)
+        feature_names = feature_names.replace('revr', 'reverse_rank')
+        feature_names = feature_names.replace('relr', 'relative_rank')
+        feature_names = feature_names.replace('\trv_idx', '\tt_reverse_idx')
+        feature_names = feature_names.replace('\trelpos', '\tt_relative_pos')
+        feature_names = feature_names.split('\t')
         dtreeviz(model, features, targets,
                  target_name='SE-IO-tag',
-                 feature_names = tr_dataset.feature_names,
+                 feature_names = feature_names,
                  class_names = labels,
        ).save('dt-%d-%d-%d-%d.svg' %(max_depth, opt_leaf_size, opt_folds, fold))
     te_features, te_gold_labels = te_dataset.get_sklearn_data()
