@@ -83,8 +83,6 @@ while True:
             fields = filename.replace('-', ' ').split()
             aio_name = fields[3].replace('.', ' ').split()[0]
             m_type = 'tab3-' + aio_name
-        elif filename == 'stdout-training-with-local-aio.txt':
-            m_type = 'tab5-old-R'
         else:
             raise ValueError('unsupported path %s/%s' %(folder, filename))
     elif line.startswith('SeqB'):
@@ -245,6 +243,9 @@ for domain, maj_acc, baseline_acc in [
         ('LIME-extra', 'tab3-S25',  '\\rLIME{}@.25'),
         ('LIME-extra', 'tab3-S50',  '\\rLIME{}@.5'),
         ('LIME-extra', 'tab3-S75',  '\\rLIME{}@.75'),
+        (None, r'\hline'),
+        (None, r'\hline'),
+        ('tab3-TG1',  'Tagger1'),
         (None, r'\hline'),
         (None, r'\hline'),
         ('tab2-SE',   'SE'),
@@ -519,6 +520,54 @@ for domain in 'Laptop Restaurant Overall'.split():
     boxplots.append(('LIME25', BoxPlot( get_cell_scores('tab3-M25', 'tr=SE/R', domain, 'SE/R'))))
     boxplots.append(('LIME50', BoxPlot( get_cell_scores('tab3-M50', 'tr=SE/R', domain, 'SE/R'))))
     boxplots.append(('LIME75', BoxPlot( get_cell_scores('tab3-M75', 'tr=SE/R', domain, 'SE/R'))))
+
+    boxplots.append(('Full', BoxPlot(
+        get_cell_scores('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 0),
+    )))
+    header = []
+    header.append('Attribute')
+    for bp_name, _ in boxplots:
+        header.append(bp_name)
+    f.write('\t'.join(header))
+    f.write('\n')
+    for attr_name in 'B Q1 M Q3 T'.split():
+        row = []
+        row.append(attr_name)
+        for bp_name, boxplot in boxplots:
+            row.append('%.9f' %(boxplot[attr_name]))
+        f.write('\t'.join(row))
+        f.write('\n')
+    for d_code in 'OD':
+        outlier_index = 0
+        while True:
+            found_outlier = False
+            row = []
+            row.append('%s_%d' %(d_code, outlier_index + 1))
+            for bp_name, boxplot in boxplots:
+                try:
+                    outlier = '%.9f' %(boxplot[(d_code, outlier_index)])
+                    found_outlier = True
+                except IndexError:
+                    outlier = ''
+                row.append(outlier)
+            if not found_outlier:
+                break
+            f.write('\t'.join(row))
+            f.write('\n')
+            outlier_index += 1
+    f.close()
+
+
+    sys.stderr.write('Writing box-plot-tagger for %s...\n' %domain)
+    f = open('box-plot-tagger-%s.tsv' %domain, 'wt')
+
+    boxplots = []
+    boxplots.append(('None', BoxPlot(
+        get_cell_scores('tab2-SE', 'tr=None', domain, 'None', extra_sets = 0),
+    )))
+
+    boxplots.append(('INV-Tagger1', BoxPlot(get_cell_scores('tab3-TG1', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('Tagger1', BoxPlot( get_cell_scores('tab3-TG1', 'tr=SE/R', domain, 'SE/R'))))
 
     boxplots.append(('Full', BoxPlot(
         get_cell_scores('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 0),

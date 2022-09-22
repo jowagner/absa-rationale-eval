@@ -29,6 +29,7 @@ nep =     10  # int(fields[5])
 
 gpus = [
     ('rtx6000',  16, ''),
+    #('rtxa6000',  32, ''),  # cuda error with current cude environment
     ('rtx3090',  16, ''),
     #('titanv',   6, '#SBATCH --reservation=themea'),  # issue with cuda env
     ('rtx2080ti', 8, ''),
@@ -70,9 +71,12 @@ for tr_task_short, tr_task_long, runs_per_set, hours_per_epoch in [
      ('X25', True,  'best-X25.ckpt'),
      ('X50', True,  'best-X50.ckpt'),
      ('X75', True,  'best-X75.ckpt'),
+     ('TG1', True,  'best-TG1.ckpt'),
   ]:
     sys.stdout.write('%s %s %s\n' %(tr_task_short, gpu, aio_name))
     if aio_name == 'sea' and tr_task_short in 'fn':
+        n_sets = 8
+    elif aio_name.startswith('RND') and tr_task_short in 'so':
         n_sets = 8
     else:
         n_sets = 4
@@ -138,7 +142,7 @@ for RUN in 1 2 3 ; do
         for D in laptop restaurant ; do
             for T in train test ; do
 """ %locals())
-                if aio_name[0] in 'LMNPSX':
+                if aio_name[0] in 'LMNPSTX':
                     f.write("""
                 cp ../c-f-${SET}-${RUN}/${T}-${D}-${L}.aio $LAIODIR/${T}.${D}.aio
 """ %locals())
