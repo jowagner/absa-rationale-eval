@@ -26,6 +26,7 @@ opt_workdir = sys.argv[1]
 tagger_version = int(sys.argv[2])
 opt_folds   = 20
 opt_leaf_size = None  # will be set below depending on tagger version
+opt_context   = None  # will be set below depending on tagger version
 opt_seed_for_data_split = 101
 opt_viz_tree = False
 domains = 'laptop restaurant'.split()
@@ -43,8 +44,8 @@ tagger_version_to_default_leaf_size = {
 if opt_leaf_size is None:
     opt_leaf_size = tagger_version_to_default_leaf_size[tagger_version]
 
-if tagger_version in (2,4):
-    raise NotImplementedError
+if opt_context is None:
+    opt_context = 2 if tagger_version % 2 == 0 else 0
 
 opt_training_data = os.path.join(opt_workdir, 'lime-features-tr.tsv')
 opt_test_data     = os.path.join(opt_workdir, 'lime-features-te.tsv')
@@ -66,14 +67,37 @@ class IODataset:
     def __getitem__(self, index):
         return self.data[index]
 
-    def get_sklearn_data(self):
+    def get_sklearn_data(self, context = 0):
         rows = len(self.data)
         columns = self.sea_column
+        if context > 0:
+            token_specific_features = self.header.index('t_idx')
+            id_column = self.header.index('item_ID')
+            centre_features = columns
+            columns += 4 * token_specific_features
         features = numpy.zeros((rows, columns), dtype=numpy.float64)
         targets  = numpy.zeros(rows, dtype=numpy.int8)
         for row_index, item in enumerate(self):
             for col_index, value in enumerate(item[:self.sea_column]):
                 features[row_index, col_index] = float(value)
+                if context > 0 and col_index < token_specific_features:
+                    my_id = item[id_column]
+                    block_index = 0
+                    rel_pos = -context
+                    while rel_pos <= context:
+                        target_row_index = row_index + rel_pos
+                        if 0 <= target_row_index < rows:
+                            target_id = self[target_row_index][id_column]
+                            if my_id == target_id:
+                                target_col_index = centre_features + \
+                                    block_index * token_specific_features + \
+                                    col_index
+                                features[target_row_index, target_col_index] = float(value)
+                            # else: keep zero value
+                        block_index += 1
+                        rel_pos += 1
+                        if rel_pos == 0:
+                            rel_pos += 1
             targets[row_index] = int(item[self.sea_column])
         return features, targets
 
@@ -190,7 +214,7 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
         len(tr_dataset), len(te_dataset)
     ))
     # train model for this fold
-    features, targets = tr_dataset.get_sklearn_data()
+    features, targets = tr_dataset.get_sklearn_data(context = opt_context)
     if tagger_version in (1,2):
         model = DecisionTreeClassifier(
             max_depth = max_depth,
@@ -216,7 +240,7 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
                  feature_names = feature_names,
                  class_names = labels,
        ).save('dt-%d-%d-%d-%d.svg' %(max_depth, opt_leaf_size, opt_folds, fold))
-    te_features, te_gold_labels = te_dataset.get_sklearn_data()
+    te_features, te_gold_labels = te_dataset.get_sklearn_data(context = opt_context)
     predictions = model.predict(te_features)
     for i in range(len(te_gold_labels)):
         if te_gold_labels[i] == predictions[i]:
@@ -244,7 +268,7 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
             group2data[group_key] = []
         group2data[group_key].append((item, predictions[index]))
     # (2) overall test data: assign fold to use by hash of sentence_id
-    overall_te_features, _ = overall_te_dataset.get_sklearn_data()
+    overall_te_features, _ = overall_te_dataset.get_sklearn_data(context = opt_context)
     predictions = model.predict(overall_te_features)
     for index, item in enumerate(overall_te_dataset):
         item_id = item[id_column].split(':')
