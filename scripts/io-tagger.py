@@ -19,18 +19,63 @@ import sys
 import evaluation
 
 def usage():
-    print('Usage: $0 [options] c-f-1-1')
+    print('Usage: $0 [options]')
     # TODO: print more details how to use this script
 
-opt_workdir = sys.argv[1]
-tagger_version = int(sys.argv[2])
+opt_workdir = './'
+tagger_version = 1
 opt_folds   = 20
 opt_leaf_size = None  # will be set below depending on tagger version
 opt_context   = None  # will be set below depending on tagger version
 opt_seed_for_data_split = 101
 opt_viz_tree = False
+max_depth = 20
 domains = 'laptop restaurant'.split()
 labels  = 'O I'.split()
+
+tagger_names = 'DT DT+C RF RF+C'.split()
+
+while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
+    option = sys.argv[1].replace('_', '-')
+    del sys.argv[1]
+    if option in ('-h', '--help'):
+        usage()
+        sys.exit(0)
+    elif option in ('--workdir', '--work-dir'):
+        opt_workdir = sys.argv[1]
+        del sys.argv[1]
+    elif option == '--tagger':
+        try:
+            tagger_version = tagger_names.index(sys.argv[1])
+        except:
+            tagger_version = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--folds', '--n-folds'):
+        opt_folds = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--leaf-size', '--min-leaf-size'):
+        opt_leaf_size = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--context', '--window'):
+        opt_context = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--seed', '--random-seed'):
+        opt_seed_for_data_split = int(sys.argv[1])
+        del sys.argv[1]
+    elif option in ('--viz', '--visualise-tree'):
+        opt_viz_tree = True
+        max_depth = 6
+    elif option in ('--max-depth', '--max-tree-height'):
+        opt_max_depth = int(sys.argv[1])
+        del sys.argv[1]
+    else:
+        print('Unknown option', option)
+        usage()
+        sys.exit(1)
+
+if len(sys.argv) > 1:
+    usage()
+    sys.exit(1)
 
 assert 1 <= tagger_version <= 4
 
@@ -52,9 +97,6 @@ opt_test_data     = os.path.join(opt_workdir, 'lime-features-te.tsv')
 
 if opt_viz_tree:
     from dtreeviz.trees import dtreeviz
-    max_depth = 6
-else:
-    max_depth = 20
 
 # TODO: allow above setting to be changed from the command line
 
