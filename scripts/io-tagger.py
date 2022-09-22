@@ -12,6 +12,7 @@ import hashlib
 import numpy
 import os
 import random
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 import sys
 
@@ -22,12 +23,28 @@ def usage():
     # TODO: print more details how to use this script
 
 opt_workdir = sys.argv[1]
+tagger_version = int(sys.argv[2])
 opt_folds   = 20
-opt_leaf_size = 1376
+opt_leaf_size = None  # will be set below depending on tagger version
 opt_seed_for_data_split = 101
 opt_viz_tree = False
 domains = 'laptop restaurant'.split()
 labels  = 'O I'.split()
+
+assert 1 <= tagger_version <= 4
+
+tagger_version_to_default_leaf_size = {
+    1: 1376,  # DT with per-token features
+    2:  250,  # DT with context features   # TODO: tune
+    3:   17,  # RF with per-token features
+    4:   11,  # RF with context features   # TODO: tune
+}
+
+if opt_leaf_size is None:
+    opt_leaf_size = tagger_version_to_default_leaf_size[tagger_version]
+
+if tagger_version in (2,4):
+    raise NotImplementedError
 
 opt_training_data = os.path.join(opt_workdir, 'lime-features-tr.tsv')
 opt_test_data     = os.path.join(opt_workdir, 'lime-features-te.tsv')
@@ -174,11 +191,18 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
     ))
     # train model for this fold
     features, targets = tr_dataset.get_sklearn_data()
-    model = DecisionTreeClassifier(
-        max_depth = max_depth,
-        min_samples_leaf  = opt_leaf_size,
-        random_state = 101,
-    )
+    if tagger_version in (1,2):
+        model = DecisionTreeClassifier(
+            max_depth = max_depth,
+            min_samples_leaf  = opt_leaf_size,
+            random_state = 101,
+        )
+    elif tagger_version in (3,4):
+        model = RandomForestClassifier(
+            n_estimators = 100,
+            min_samples_leaf = opt_leaf_size,
+            random_state = 101,
+        )
     model.fit(features, targets)
     if opt_viz_tree:
         feature_names = '\t'.join(tr_dataset.feature_names)
@@ -247,7 +271,7 @@ if not opt_viz_tree:
             ('te', 'test'),
         ]:
             f = open(
-                os.path.join(opt_workdir, '%s-%s-TG1.aio' %(long_set_name, domain)),
+                os.path.join(opt_workdir, '%s-%s-TG%d.aio' %(long_set_name, domain, tagger_version)),
                 'wt'
             )
             for group_key in sorted_group_keys:
