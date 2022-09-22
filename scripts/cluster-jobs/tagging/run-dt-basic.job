@@ -7,16 +7,24 @@
 #SBATCH --ntasks=1
 #SBATCH -N 1-1
 
+MAX_JOBS=12
 
 PRJ_DIR=${HOME}/sentiment/absa-rationale-eval
 cd $PRJ_DIR
 source venv-pytorch/bin/activate
 
+for TAGGER in 1 2 3 4 ; do
 for SET in 1 2 3 4; do
 for RUN in 1 2 3 ; do
     MODEL_DIR=c-f-${SET}-${RUN}
-    scripts/io-tagger.py $MODEL_DIR &
+    scripts/io-tagger.py --workdir $MODEL_DIR --tagger $TAGGER &
     sleep 2
+    # limit number of tasks running in parallel
+    while [ `jobs -r | wc -l | tr -d " "` -ge ${MAX_JOBS} ]; do
+        sleep 5
+    done
+
+done
 done
 done
 
