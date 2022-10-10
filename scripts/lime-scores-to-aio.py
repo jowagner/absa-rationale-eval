@@ -360,7 +360,7 @@ for set_code, set_name, set_long_name in opt_sets:   # e.g. 'tr', 'train', 'trai
                                 row.append('%.9f' %(key2scores[lime_code][1][t_index]))
                                 is_normalised = key2scores[lime_code][2]
                                 row.append('1' if is_normalised else '0')
-                                rank = key2scores[lime_code][3][t_index]
+                                rank = key2scores[lime_code][3].index(t_index)
                                 row.append('%d' %rank)
                                 row.append('%d' %(n_tokens-1-rank))
                                 row.append('%.9f' %(rank/float(n_tokens)))
