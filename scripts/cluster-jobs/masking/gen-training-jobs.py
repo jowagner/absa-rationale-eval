@@ -13,6 +13,15 @@ import sys
 
 local_aio = True
 
+if len(sys.argv) > 1 and sys.argv[1] == '--eval':
+    mode_code  = 'e'
+    mode_short = 'eval'
+    mode_long  = 'evaluation'
+else:
+    mode_code  = 't'
+    mode_short = 'train'
+    mode_long  = 'training'
+
 #fhp = open('../../hparams.txt', 'rt')
 #while True:
 # line = fhp.readline()
@@ -29,7 +38,7 @@ nep =     10  # int(fields[5])
 
 gpus = [
     ('rtx6000',  16, ''),
-    #('rtxa6000',  32, ''),  # cuda error with current cude environment
+    #('rtxa6000',  32, ''),  # cuda error with current cuda environment
     ('rtx3090',  16, ''),
     #('titanv',   6, '#SBATCH --reservation=themea'),  # issue with cuda env
     ('rtx2080ti', 8, ''),
@@ -42,6 +51,8 @@ for tr_task_short, tr_task_long, runs_per_set, hours_per_epoch in [
      ('n', 'None',   3, 0.149),
      ('a', 'All',   12, 0.149),
 ]:
+ if mode_short == 'eval':
+  hours_per_epoch = 0.0
  hours = int(1+runs_per_set*hours_per_epoch*nep)
  max_minutes = int(45+1.2*runs_per_set*hours_per_epoch*60*nep)
  for gpu, batchsize, more_sbatch in gpus:
@@ -72,6 +83,9 @@ for tr_task_short, tr_task_long, runs_per_set, hours_per_epoch in [
      ('X50', True,  'best-X50.ckpt'),
      ('X75', True,  'best-X75.ckpt'),
      ('TG1', True,  'best-TG1.ckpt'),
+     ('TG2', True,  'best-TG2.ckpt'),
+     ('TG3', True,  'best-TG3.ckpt'),
+     ('TG4', True,  'best-TG4.ckpt'),
   ]:
     sys.stdout.write('%s %s %s\n' %(tr_task_short, gpu, aio_name))
     if aio_name == 'sea' and tr_task_short in 'fn':
@@ -82,14 +96,14 @@ for tr_task_short, tr_task_long, runs_per_set, hours_per_epoch in [
         n_sets = 4
     for set_index in range(n_sets):
         set_rank = 1 + set_index
-        with open('%s/run-train-c-%s-%s-%d1-to-%d3.job' %(   #-hp-%d.job' %(
-            gpu, aio_name, tr_task_short, set_rank, set_rank #, hparam
+        with open('%s/run-%s-c-%s-%s-%d1-to-%d3.job' %(   #-hp-%d.job' %(
+            gpu, mode_short, aio_name, tr_task_short, set_rank, set_rank #, hparam
         ), 'w') as f:
             f.write("""#!/bin/bash
 
 #SBATCH -p compute       # which partition to run on
 #SBATCH --gres=gpu:%(gpu)s:1
-#SBATCH -J ab-%(tr_task_short)s%(set_rank)d-%(hours)dh    # name for the job
+#SBATCH -J a%(mode_code)s-%(tr_task_short)s%(set_rank)d-%(hours)dh    # name for the job
 #SBATCH --mem=47000
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
@@ -105,7 +119,7 @@ HPARAM=''
 L=%(aio_name)s
 """ %locals())
             f.write("""
-DESC=training-with-%(aio_name)s-aio
+DESC=%(mode_long)s-with-%(aio_name)s-aio
 """ %locals())
 
             f.write("""
@@ -175,11 +189,11 @@ for RUN in 1 2 3 ; do
 
             if local_aio:
                 f.write("""
-    ../scripts/train-classifier.py --batch-size %(batchsize)d --aio-prefix $LAIODIR/ --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --batch-size %(batchsize)d --aio-prefix $LAIODIR/ --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} %(mode_short)s $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
             else:
                 f.write("""
-    ../scripts/train-classifier.py --batch-size %(batchsize)d --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} train $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --batch-size %(batchsize)d --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} %(mode_short)s $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
 
             f.write("""
