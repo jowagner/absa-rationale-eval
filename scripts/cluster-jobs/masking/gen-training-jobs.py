@@ -17,10 +17,12 @@ if len(sys.argv) > 1 and sys.argv[1] == '--eval':
     mode_code  = 'e'
     mode_short = 'eval'
     mode_long  = 'evaluation'
+    model_action = 'load-model-from'
 else:
     mode_code  = 't'
     mode_short = 'train'
     mode_long  = 'training'
+    model_action = 'save-model-as'
 
 #fhp = open('../../hparams.txt', 'rt')
 #while True:
@@ -136,6 +138,9 @@ for RUN in 1 2 3 ; do
     MODEL_DIR=${MODEL_DIR_PREFIX}
     mkdir $MODEL_DIR
     cd $MODEL_DIR
+""" %locals())
+            if mode_short == 'train':
+                f.write("""
     if [ -e %(save_as)s ] ; then
         echo "Found existing model -- skipping"
         continue
@@ -189,11 +194,11 @@ for RUN in 1 2 3 ; do
 
             if local_aio:
                 f.write("""
-    ../scripts/train-classifier.py --batch-size %(batchsize)d --aio-prefix $LAIODIR/ --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} %(mode_short)s $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --batch-size %(batchsize)d --aio-prefix $LAIODIR/ --%(model_action)s %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} %(mode_short)s $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
             else:
                 f.write("""
-    ../scripts/train-classifier.py --batch-size %(batchsize)d --save-model-as %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} %(mode_short)s $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --batch-size %(batchsize)d --%(model_action) %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} %(mode_short)s $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
 
             f.write("""
