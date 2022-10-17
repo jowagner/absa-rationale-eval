@@ -198,7 +198,7 @@ for RUN in 1 2 3 ; do
 """ %locals())
             else:
                 f.write("""
-    ../scripts/train-classifier.py --batch-size %(batchsize)d --%(model_action) %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} %(mode_short)s $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
+    ../scripts/train-classifier.py --batch-size %(batchsize)d --%(model_action)s %(save_as)s --lr1 %(lr1)d --lr2 %(lr2)d --fre %(fre)d --vbs %(vbs)d --epochs %(nep)d --trdev-seed ${SET}${RUN} ${HPARAM}${SET}${RUN} %(mode_short)s $TR_TASK 2> stderr-${DESC}.txt > stdout-${DESC}.txt
 """ %locals())
 
             f.write("""
