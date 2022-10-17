@@ -12,6 +12,7 @@ import os
 import sys
 
 local_aio = True
+opt_repeat_eval = False
 
 if len(sys.argv) > 1 and sys.argv[1] == '--eval':
     mode_code  = 'e'
@@ -138,6 +139,13 @@ for RUN in 1 2 3 ; do
     MODEL_DIR=${MODEL_DIR_PREFIX}
     mkdir $MODEL_DIR
     cd $MODEL_DIR
+""" %locals())
+            if mode_short == 'eval' and not opt_repeat_eval:
+                f.write("""
+    if [ -e stdout-${DESC}.txt ] ; then
+        echo "Found existing output file -- skipping"
+        continue
+    fi
 """ %locals())
             if mode_short == 'train':
                 f.write("""
