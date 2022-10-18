@@ -130,6 +130,8 @@ PRJ_DIR=${HOME}/sentiment/absa-rationale-eval
 cd $PRJ_DIR
 source venv-pytorch/bin/activate
 
+echo "= Task $TR_TASK Set $SET AIO $L ="
+
 for RUN in 1 2 3 ; do
     echo "== Run $RUN =="
     date
@@ -137,7 +139,7 @@ for RUN in 1 2 3 ; do
     MODEL_DIR_PREFIX=c-${TR_TASK_SHORT}-${SET}-${RUN}
     #MODEL_DIR=${MODEL_DIR_PREFIX}-${HPARAM}
     MODEL_DIR=${MODEL_DIR_PREFIX}
-    mkdir $MODEL_DIR
+    mkdir -p $MODEL_DIR
     cd $MODEL_DIR
 """ %locals())
             if mode_short == 'eval' and not opt_repeat_eval:
