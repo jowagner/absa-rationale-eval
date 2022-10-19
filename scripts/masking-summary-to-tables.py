@@ -71,6 +71,12 @@ while True:
         run_in_set = int(fields[3])
         run = opt_runs_per_set * set_index + run_in_set
         tr = trshort2sortkey[fields[1]]
+        # also accept evaluation-only results
+        orig_filename = filename
+        filename = filename.replace(
+            'stdout-evaluation-with',
+            'stdout-training-with'
+        )
         if filename in ('stdout-training-with-sea-aio.txt', 'stdout.txt'):
             m_type = 'tab2-SE'
         elif 'with-union-aio' in filename:
@@ -84,7 +90,7 @@ while True:
             aio_name = fields[3].replace('.', ' ').split()[0]
             m_type = 'tab3-' + aio_name
         else:
-            raise ValueError('unsupported path %s/%s' %(folder, filename))
+            raise ValueError('unsupported path %s/%s' %(folder, orig_filename))
     elif line.startswith('SeqB'):
         fields = line.split('\t')
         # check column header
@@ -246,6 +252,9 @@ for domain, maj_acc, baseline_acc in [
         (None, r'\hline'),
         (None, r'\hline'),
         ('tab3-TG1',  'Tagger1'),
+        ('tab3-TG2',  'Tagger2'),
+        ('tab3-TG3',  'Tagger3'),
+        ('tab3-TG4',  'Tagger4'),
         (None, r'\hline'),
         (None, r'\hline'),
         ('tab2-SE',   'SE'),
@@ -568,6 +577,12 @@ for domain in 'Laptop Restaurant Overall'.split():
 
     boxplots.append(('INV-Tagger1', BoxPlot(get_cell_scores('tab3-TG1', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
     boxplots.append(('Tagger1', BoxPlot( get_cell_scores('tab3-TG1', 'tr=SE/R', domain, 'SE/R'))))
+    boxplots.append(('INV-Tagger2', BoxPlot(get_cell_scores('tab3-TG2', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('Tagger2', BoxPlot( get_cell_scores('tab3-TG2', 'tr=SE/R', domain, 'SE/R'))))
+    boxplots.append(('INV-Tagger3', BoxPlot(get_cell_scores('tab3-TG3', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('Tagger3', BoxPlot( get_cell_scores('tab3-TG3', 'tr=SE/R', domain, 'SE/R'))))
+    boxplots.append(('INV-Tagger4', BoxPlot(get_cell_scores('tab3-TG4', 'tr=Y_Other', domain, 'Z-CompSE/R'))))
+    boxplots.append(('Tagger4', BoxPlot( get_cell_scores('tab3-TG4', 'tr=SE/R', domain, 'SE/R'))))
 
     boxplots.append(('Full', BoxPlot(
         get_cell_scores('tab2-SE', 'tr=Full', domain, 'Full', extra_sets = 0),
