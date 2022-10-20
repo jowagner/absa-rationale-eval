@@ -9,6 +9,7 @@
 # Author: Joachim Wagner
 
 import hashlib
+from imblearn.over_sampling import RandomOverSampler
 import numpy
 import os
 import random
@@ -27,6 +28,7 @@ tagger_version = 1
 opt_folds   = 20
 opt_leaf_size = None  # will be set below depending on tagger version
 opt_context   = None  # will be set below depending on tagger version
+opt_oversample = None  # will be set below depending on tagger version
 opt_seed_for_data_split = 101
 opt_viz_tree = False
 max_depth = 20
@@ -68,6 +70,10 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
     elif option in ('--max-depth', '--max-tree-height'):
         opt_max_depth = int(sys.argv[1])
         del sys.argv[1]
+    elif option == '--oversample':
+        opt_oversample = float(sys.argv[1])
+        assert opt_oversample > 0.0
+        del sys.argv[1]
     else:
         print('Unknown option', option)
         usage()
@@ -77,13 +83,14 @@ if len(sys.argv) > 1:
     usage()
     sys.exit(1)
 
-assert 1 <= tagger_version <= 4
+assert 1 <= tagger_version <= 8
 
 tagger_version_to_default_leaf_size = {
     1: 1376,  # DT with per-token features
     2:  399,  # DT with context features
     3:   17,  # RF with per-token features
     4:   13,  # RF with context features
+    # TODO: run hyper-parameter search to find best size with oversampling
 }
 
 if opt_leaf_size is None:
@@ -92,13 +99,17 @@ if opt_leaf_size is None:
 if opt_context is None:
     opt_context = 2 if tagger_version % 2 == 0 else 0
 
+if opt_oversample is None:
+    opt_oversample = 1.0 if tagger_version > 4 else False
+
 opt_training_data = os.path.join(opt_workdir, 'lime-features-tr.tsv')
 opt_test_data     = os.path.join(opt_workdir, 'lime-features-te.tsv')
 
 if opt_viz_tree:
     from dtreeviz.trees import dtreeviz
 
-# TODO: allow above setting to be changed from the command line
+if opt_context and opt_context != 2:
+    raise NotImplementedErorr   # see todo item futher below
 
 
 class IODataset:
@@ -116,7 +127,7 @@ class IODataset:
             token_specific_features = self.header.index('t_idx')
             id_column = self.header.index('item_ID')
             centre_features = columns
-            columns += 4 * token_specific_features
+            columns += 4 * token_specific_features   # TODO: support other context sizes
         features = numpy.zeros((rows, columns), dtype=numpy.float64)
         targets  = numpy.zeros(rows, dtype=numpy.int8)
         for row_index, item in enumerate(self):
@@ -257,6 +268,9 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
     ))
     # train model for this fold
     features, targets = tr_dataset.get_sklearn_data(context = opt_context)
+    if opt_oversample:
+        oversampler = RandomOverSampler(sampling_strategy = opt_oversample)
+        features, targets = oversampler.fit_resample(features, targets)
     if tagger_version in (1,2):
         model = DecisionTreeClassifier(
             max_depth = max_depth,
