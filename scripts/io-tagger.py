@@ -90,7 +90,8 @@ tagger_version_to_default_leaf_size = {
     2:  399,  # DT with context features
     3:   17,  # RF with per-token features
     4:   13,  # RF with context features
-    # TODO: run hyper-parameter search to find best size with oversampling
+    7:    1,  # RF with per-token features and oversampling
+    # TODO: run hyper-parameter search for taggers 5, 6 and 8
 }
 
 if opt_leaf_size is None:
