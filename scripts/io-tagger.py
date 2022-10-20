@@ -9,7 +9,7 @@
 # Author: Joachim Wagner
 
 import hashlib
-from imblearn.over_sampling import RandomOverSampler
+from imblearn.over_sampling import SMOTE, RandomOverSampler
 import numpy
 import os
 import random
@@ -29,6 +29,7 @@ opt_folds   = 20
 opt_leaf_size = None  # will be set below depending on tagger version
 opt_context   = None  # will be set below depending on tagger version
 opt_oversample = None  # will be set below depending on tagger version
+opt_sampler = RandomOverSampler
 opt_seed_for_data_split = 101
 opt_viz_tree = False
 max_depth = 20
@@ -74,6 +75,10 @@ while len(sys.argv) > 1 and sys.argv[1][:2] in ('--', '-h'):
         opt_oversample = float(sys.argv[1])
         assert opt_oversample > 0.0
         del sys.argv[1]
+    elif option in ('--smote', '--SMOTE'):
+        opt_sampler = SMOTE
+        if not opt_oversample:
+            opt_oversample = 1.0
     else:
         print('Unknown option', option)
         usage()
@@ -83,7 +88,7 @@ if len(sys.argv) > 1:
     usage()
     sys.exit(1)
 
-assert 1 <= tagger_version <= 8
+assert 1 <= tagger_version <= 12
 
 tagger_version_to_default_leaf_size = {
     1: 1376,  # DT with per-token features
@@ -91,6 +96,7 @@ tagger_version_to_default_leaf_size = {
     3:   17,  # RF with per-token features
     4:   13,  # RF with context features
     7:    1,  # RF with per-token features and oversampling
+    11:  25,  # RF with per-token features, SMOTE oversampling and intentionally increased leaf size
     # TODO: run hyper-parameter search for taggers 5, 6 and 8
 }
 
@@ -101,7 +107,13 @@ if opt_context is None:
     opt_context = 2 if tagger_version % 2 == 0 else 0
 
 if opt_oversample is None:
-    opt_oversample = 1.0 if tagger_version > 4 else False
+    if tagger_version > 8:
+        opt_oversample = 1.0
+        opt_sampler = SMOTE
+    elif tagger_version > 4:
+        opt_oversample = 1.0
+    else:
+        opt_oversample = False
 
 opt_training_data = os.path.join(opt_workdir, 'lime-features-tr.tsv')
 opt_test_data     = os.path.join(opt_workdir, 'lime-features-te.tsv')
@@ -211,7 +223,7 @@ class IODatasetGrouped(IODataset):
             ))
         return retval
 
-    
+
 class IODatasetFromFile(IODatasetGrouped):
 
     def __init__(self, path):
@@ -270,15 +282,15 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
     # train model for this fold
     features, targets = tr_dataset.get_sklearn_data(context = opt_context)
     if opt_oversample:
-        oversampler = RandomOverSampler(sampling_strategy = opt_oversample)
+        oversampler = opt_sampler(sampling_strategy = opt_oversample)
         features, targets = oversampler.fit_resample(features, targets)
-    if tagger_version in (1,2,5,6):
+    if tagger_version in (1,2,5,6,9,10):
         model = DecisionTreeClassifier(
             max_depth = max_depth,
             min_samples_leaf  = opt_leaf_size,
             random_state = 101,
         )
-    elif tagger_version in (3,4,7,8):
+    elif tagger_version in (3,4,7,8,11,12):
         model = RandomForestClassifier(
             n_estimators = 100,
             min_samples_leaf = opt_leaf_size,
@@ -352,7 +364,7 @@ if not opt_viz_tree:
             ('te', 'test'),
         ]:
             f = open(
-                os.path.join(opt_workdir, '%s-%s-TG%d.aio' %(long_set_name, domain, tagger_version)),
+                os.path.join(opt_workdir, '%s-%s-TG%X.aio' %(long_set_name, domain, tagger_version)),
                 'wt'
             )
             for group_key in sorted_group_keys:
