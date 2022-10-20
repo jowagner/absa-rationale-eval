@@ -271,13 +271,13 @@ for tr_dataset, te_dataset in overall_tr_dataset.get_folds(opt_folds):
     if opt_oversample:
         oversampler = RandomOverSampler(sampling_strategy = opt_oversample)
         features, targets = oversampler.fit_resample(features, targets)
-    if tagger_version in (1,2):
+    if tagger_version in (1,2,5,6):
         model = DecisionTreeClassifier(
             max_depth = max_depth,
             min_samples_leaf  = opt_leaf_size,
             random_state = 101,
         )
-    elif tagger_version in (3,4):
+    elif tagger_version in (3,4,7,8):
         model = RandomForestClassifier(
             n_estimators = 100,
             min_samples_leaf = opt_leaf_size,
