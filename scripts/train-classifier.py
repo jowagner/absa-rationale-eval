@@ -1725,7 +1725,7 @@ def get_embedding_layer(model):
     return model.bert.embeddings
     #return model.bert.embeddings.word_embeddings
 
-# EMNLP 2020 interpretatibility video at 3:09:52
+# EMNLP 2020 interpretability video at 3:09:52
 # with modifications
 
 def get_gradients(model, instances, labels):
@@ -1754,17 +1754,22 @@ best_model.unfreeze_encoder()   # otherwise gradients will not arrive at embeddi
 # next step is then at 3:12:38 to add a forward hook and calculate the saliencies
 
 def dot_and_normalise(gradients, forward_embeddings):
+    #print('\n\ndot_and_normalise() with shapes %r and %r' %(gradients.shape, forward_embeddings.shape))
     # https://discuss.pytorch.org/t/how-to-do-elementwise-multiplication-of-two-vectors/13182
     products = gradients * forward_embeddings
+    #print('\tproducts with shape', products.shape)
     # adjusted from
     # https://github.com/PAIR-code/lit/blob/main/lit_nlp/components/gradient_maps.py
     # GradientNorm._interpret()
-    norms = torch.linalg.norm(products, axis=2)
+    norms = torch.linalg.norm(products, axis=2)  # TODO: `axis` is not a documented parameter
+    #print('\tnorms with shape', norms.shape)
     sums_of_norms = torch.sum(norms, 1)
+    #print('\tsums_of_norms with shape', sums_of_norms.shape)
     assert len(sums_of_norms.shape) == 1
     # https://discuss.pytorch.org/t/tensor-division-in-batches/18392
     broadcasted_sums = sums_of_norms.view(sums_of_norms.shape[0], 1)
     normalised_norms = norms / broadcasted_sums
+    #print('\tretval with shape', normalised_norms.shape)
     return normalised_norms # , norms, products
 
 def get_alphas(variant):

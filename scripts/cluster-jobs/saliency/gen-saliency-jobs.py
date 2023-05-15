@@ -13,6 +13,9 @@ elif len(sys.argv) > 1 and sys.argv[1] == 'shortline-test':
 elif len(sys.argv) > 1 and sys.argv[1] == 'point':
     outsuffix = 'onepoint-xfw'
     options   = '--load-model-from best-sea.ckpt --gradient-method point'
+elif len(sys.argv) > 1 and sys.argv[1] == 'debug-onepoint':
+    outsuffix = 'onepoint-debug'
+    options   = '--load-model-from best-sea.ckpt --gradient-method point'
 else:
     outsuffix = 'morewio-xfw'
     options   = '--load-model-from best-sea.ckpt'
