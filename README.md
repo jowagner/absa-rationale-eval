@@ -27,6 +27,8 @@ subtask 1 data.
 | Hugging Face transformers | 4.8.1  | 4.9.1 |
 | pytorch-lightning | 1.3.7.post0    | 1.4.1 |
 | Python       | 3.6.13 - 3.6.15     | 3.7.3 |
+| wordcloud    |                     | n/a   |
+| imbalanced-learn |                 |       |
 
 * `create-venv-pytorch*.sh`: how the environment was set up
 * `pip-freeze-snapshot*.txt`: all version numbers, including for indirect dependencies
@@ -132,5 +134,11 @@ We use Python 3 to ease reproduction of results.
 
 ## Citation
 
-Here we will provide details on the paper this software is first used in when it is accepted.
+If you use this code for your research, please cite our paper:
+
+Joachim Wagner and Jennifer Foster (to appear at ACL 2023) 
+Investigating the Saliency of Sentiment Expressions in Aspect-Based Sentiment Analysis.
+In *Findings of the Association for Computational Linguistics: ACL 2023*,
+Toronto, Canada, 09-14 July 2023,
+Association for Computational Linguistics.
 
